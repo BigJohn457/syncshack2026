@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'datetime.dart';
+import 'screens/log_in.dart';
+import 'screens/sign_up.dart';
+import 'screens/gp_info.dart';
+import 'screens/edit_profile.dart';
+import 'screens/settings.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,7 +26,52 @@ class MyApp extends StatelessWidget {
           primary: const Color(0xFF6C3EE8),
         ),
       ),
-      home: const HomePage(),
+      home: const _LogInLanding(),
+    );
+  }
+}
+
+// -------------------------------------------------------------
+// AUTH FLOW: wires LogInPage <-> SignUpPage <-> HomePage together
+// -------------------------------------------------------------
+class _LogInLanding extends StatelessWidget {
+  const _LogInLanding();
+
+  @override
+  Widget build(BuildContext context) {
+    return LogInPage(
+      onForgotPassword: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password reset coming soon!')),
+        );
+      },
+      onGoToSignUp: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const _SignUpLanding()),
+        );
+      },
+      onLogIn: (email, password) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomePage()),
+        );
+      },
+    );
+  }
+}
+
+class _SignUpLanding extends StatelessWidget {
+  const _SignUpLanding();
+
+  @override
+  Widget build(BuildContext context) {
+    return SignUpPage(
+      onBack: () => Navigator.of(context).pop(),
+      onGoToLogIn: () => Navigator.of(context).pop(),
+      onSignUp: (name, email, password) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomePage()),
+        );
+      },
     );
   }
 }
@@ -36,6 +86,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedCardIndex = 0;
   String? _selectedPinId;
+  String _userName = 'John Ng';
+  String _userStatus = 'Open for coffee ☕';
 
   // Match Cards Data
   final List<Map<String, dynamic>> _matchCards = [
@@ -464,12 +516,16 @@ class _HomePageState extends State<HomePage> {
                         color: Color(0xFF6C3EE8),
                       ),
                       const SizedBox(width: 3),
-                      Text(
-                        currentCard['distance'],
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF6C3EE8),
+                      Flexible(
+                        child: Text(
+                          currentCard['distance'],
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF6C3EE8),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -796,173 +852,6 @@ class _HomePageState extends State<HomePage> {
   // BOTTOM SHEETS & INTERACTIVE MODALS
   // =============================================================
 
-  // 1. New Meetup Request Modal Form
-  void _showNewMeetupSheet() {
-    String selectedActivity = 'Coffee ☕';
-    final activities = ['Coffee ☕', 'Walk 🚶', 'Brunch 🥐', 'Explore 🌉', 'Hangout 🎉'];
-    final noteController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Container(
-              padding: EdgeInsets.only(
-                top: 20,
-                left: 24,
-                right: 24,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle Bar
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4.5,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'New Meetup Request',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF1E1B2E),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close_rounded),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ],
-                  ),
-                  const Text(
-                    'Post a quick request for people nearby to join you.',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF6D6B82)),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Category Selector
-                  const Text(
-                    'What are you looking to do?',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E1B2E)),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: activities.map((act) {
-                      final isSelected = selectedActivity == act;
-                      return GestureDetector(
-                        onTap: () {
-                          setSheetState(() {
-                            selectedActivity = act;
-                          });
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFF6C3EE8) : const Color(0xFFF1F1F8),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Text(
-                            act,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : const Color(0xFF1E1B2E),
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Message Input
-                  const Text(
-                    'Add a brief note',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E1B2E)),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: noteController,
-                    decoration: InputDecoration(
-                      hintText: 'e.g. Grabbing an iced latte, free for 30 mins...',
-                      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                      filled: true,
-                      fillColor: const Color(0xFFF6F6FC),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Post Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                                const SizedBox(width: 8),
-                                Text('Posted "$selectedActivity" to the map! 🎉'),
-                              ],
-                            ),
-                            backgroundColor: const Color(0xFF6C3EE8),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6C3EE8),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                      ),
-                      child: const Text(
-                        'Post Request to Map',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   // 2. Top Match Detail Sheet
   void _showTopMatchDetailSheet(Map<String, dynamic> match) {
     showModalBottomSheet(
@@ -1063,16 +952,22 @@ class _HomePageState extends State<HomePage> {
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Connected with ${match['person']}! ☕'),
-                            backgroundColor: const Color(0xFF6C3EE8),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        final cancelled = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => GpInfoPage(
+                              meetupTitle: match['title'].toString().toUpperCase(),
+                              meetupSubtitle: 'With ${match['person']} · ${match['place']}',
+                            ),
                           ),
                         );
+                        if (cancelled == true && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Meetup cancelled.')),
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6C3EE8),
@@ -1157,16 +1052,22 @@ class _HomePageState extends State<HomePage> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Requested to join ${pin.author}! ✨'),
-                        backgroundColor: const Color(0xFF6C3EE8),
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    final cancelled = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => GpInfoPage(
+                          meetupTitle: pin.title.replaceAll('\n', ' ').toUpperCase(),
+                          meetupSubtitle: '${pin.category} · ${pin.time}',
+                        ),
                       ),
                     );
+                    if (cancelled == true && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Meetup cancelled.')),
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6C3EE8),
@@ -1300,21 +1201,53 @@ class _HomePageState extends State<HomePage> {
                 child: const Icon(Icons.person, color: Colors.white, size: 40),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'John Ng',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                _userName,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const Text('Active Status: Open for coffee ☕', style: TextStyle(color: Color(0xFF6C3EE8), fontSize: 13)),
+              Text('Active Status: $_userStatus', style: const TextStyle(color: Color(0xFF6C3EE8), fontSize: 13)),
               const SizedBox(height: 20),
               ListTile(
                 leading: const Icon(Icons.edit, color: Color(0xFF6C3EE8)),
                 title: const Text('Edit Profile & Status'),
-                onTap: () => Navigator.pop(context),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await Navigator.push<Map<String, String>>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditProfilePage(
+                        currentName: _userName,
+                        currentStatus: _userStatus,
+                      ),
+                    ),
+                  );
+                  if (result != null && mounted) {
+                    setState(() {
+                      _userName = result['name'] ?? _userName;
+                      _userStatus = result['status'] ?? _userStatus;
+                    });
+                  }
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.settings, color: Color(0xFF6C3EE8)),
                 title: const Text('Settings & Privacy'),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SettingsPage(
+                        onLogOut: () {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(builder: (_) => const _LogInLanding()),
+                            (route) => false,
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -1362,7 +1295,18 @@ class _HomePageState extends State<HomePage> {
                 ),
                 title: const Text('Elena accepted your coffee request!'),
                 subtitle: const Text('10 mins ago'),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const GpInfoPage(
+                        meetupTitle: 'COFFEE WITH ELENA',
+                        meetupSubtitle: 'Accepted · Today',
+                      ),
+                    ),
+                  );
+                },
               ),
               ListTile(
                 leading: const CircleAvatar(
@@ -1371,7 +1315,10 @@ class _HomePageState extends State<HomePage> {
                 ),
                 title: const Text('You have 3 new top matches nearby'),
                 subtitle: const Text('1 hour ago'),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showTopMatchDetailSheet(_matchCards[0]);
+                },
               ),
             ],
           ),
