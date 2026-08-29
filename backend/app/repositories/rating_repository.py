@@ -29,8 +29,8 @@ class RatingRepository:
             meetup = cursor.fetchone()
             if meetup is None:
                 raise RatingEligibilityError("meetup not found")
-            if meetup["status"] != "completed":
-                raise RatingEligibilityError("meetup must be completed before rating")
+            if meetup["status"] == "cancelled":
+                raise RatingEligibilityError("cancelled meetups cannot be rated")
             if from_user_id == submission.to_user_id:
                 raise RatingEligibilityError("users cannot rate themselves")
 
@@ -42,14 +42,21 @@ class RatingRepository:
                 """,
                 (submission.meetup_id, from_user_id, submission.to_user_id),
             )
-            attendees = {
-                row["user_id"]
+            participants = {
+                row["user_id"]: row["attendance_status"]
                 for row in cursor.fetchall()
-                if row["attendance_status"] in {"attended", "finished"}
             }
-            if attendees != {from_user_id, submission.to_user_id}:
+            if participants.get(from_user_id) != "finished":
                 raise RatingEligibilityError(
-                    "both users must have attended the meetup"
+                    "finish your participation before submitting ratings"
+                )
+            if participants.get(submission.to_user_id) not in {
+                "joined",
+                "attended",
+                "finished",
+            }:
+                raise RatingEligibilityError(
+                    "the selected user did not participate in the meetup"
                 )
 
             cursor.execute(

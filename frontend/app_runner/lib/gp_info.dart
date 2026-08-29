@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'auth/auth_api.dart';
+import 'meetups/meetup_api.dart';
 import 'rate.dart';
 import 'home_page.dart';
 
@@ -289,7 +291,20 @@ class GpInfoPage extends StatelessWidget {
                     children: [
                       // 🟢 Green "Finished" Button -> Goes to rate.dart
                       GestureDetector(
-                        onTap: () {
+                        onTap: () async {
+                          try {
+                            await MeetupApi().finishParticipation(meetupId);
+                          } on AuthException catch (error) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(error.message),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
+                          if (!context.mounted) return;
                           Navigator.push(
                             context,
                             MaterialPageRoute(

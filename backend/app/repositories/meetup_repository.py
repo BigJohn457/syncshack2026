@@ -73,6 +73,26 @@ class MeetupRepository:
 
             cursor.execute(
                 """
+                SELECT r.max_people,
+                    (SELECT COUNT(*) FROM request_participants AS rp
+                     WHERE rp.request_id = r.request_id
+                       AND rp.status = 'accepted') AS accepted_count
+                FROM requests AS r
+                WHERE r.request_id = %s
+                LIMIT 1
+                """,
+                (meetup["request_id"],),
+            )
+            capacity = cursor.fetchone()
+            if capacity is None:
+                raise InvitationNotFoundError("request not found")
+            accepted_count = int(capacity["accepted_count"])
+            max_people = int(capacity["max_people"])
+            if accepted_count >= max_people:
+                raise MeetupUnavailableError("meetup is already full")
+
+            cursor.execute(
+                """
                 UPDATE request_participants
                 SET status = 'accepted'
                 WHERE request_id = %s AND user_id = %s
@@ -89,6 +109,14 @@ class MeetupRepository:
                 """,
                 (acceptance.meetup_id, user_id),
             )
+            if accepted_count + 1 >= max_people:
+                cursor.execute(
+                    """
+                    UPDATE requests SET status = 'matched'
+                    WHERE request_id = %s AND status = 'open'
+                    """,
+                    (meetup["request_id"],),
+                )
             connection.commit()
             return MeetupParticipant(
                 meetup_id=acceptance.meetup_id,
@@ -234,14 +262,17 @@ class MeetupRepository:
         cursor = connection.cursor(dictionary=True)
         try:
             cursor.execute(
-                "SELECT status FROM meetups WHERE meetup_id = %s LIMIT 1",
+                """
+                SELECT status FROM meetups
+                WHERE meetup_id = %s LIMIT 1 FOR UPDATE
+                """,
                 (meetup_id,),
             )
             meetup = cursor.fetchone()
             if meetup is None:
                 raise InvitationNotFoundError("meetup not found")
-            if meetup["status"] != "completed":
-                raise MeetupUnavailableError("meetup is not completed")
+            if meetup["status"] == "cancelled":
+                raise MeetupUnavailableError("meetup is cancelled")
 
             cursor.execute(
                 """
@@ -262,11 +293,28 @@ class MeetupRepository:
                 """,
                 (meetup_id, user_id),
             )
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS remaining_count
+                FROM meetup_participants
+                WHERE meetup_id = %s
+                  AND attendance_status IN ('joined', 'attended')
+                """,
+                (meetup_id,),
+            )
+            remaining_count = int(cursor.fetchone()["remaining_count"])
+            meetup_completed = remaining_count == 0
+            if meetup_completed and meetup["status"] != "completed":
+                cursor.execute(
+                    "UPDATE meetups SET status = 'completed' WHERE meetup_id = %s",
+                    (meetup_id,),
+                )
             connection.commit()
             return {
                 "meetup_id": meetup_id,
                 "user_id": user_id,
                 "attendance_status": "finished",
+                "meetup_completed": meetup_completed,
             }
         except Exception:
             connection.rollback()

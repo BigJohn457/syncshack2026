@@ -290,6 +290,11 @@ Success — `201`:
 If the participant is already accepted, the same endpoint returns their
 existing `meetup_id` with `invitation_status: "accepted"`.
 
+After an invitation is accepted, the backend counts accepted participants. If
+that count reaches `max_people`, the request status is atomically changed from
+`open` to `matched`. Nearby discovery only returns `open` requests, so a full
+request is no longer shown on the home map.
+
 Errors: `400` invalid input/missing identity, `404` request or user not found,
 `409` request is unavailable or belongs to the caller, `500` database error.
 
@@ -764,8 +769,9 @@ returns `200`; that object's `exists` value is `false` and its status/timestamp
 fields are `null`.
 
 Possible `meetup_participant.attendance_status` values are `joined`, `attended`,
-`finished`, `no_show`, `left`, and `cancelled`. `finished` means that the user
-has submitted or skipped the optional rating stage. Possible `request_participant.status` values
+`finished`, `no_show`, `left`, and `cancelled`. `finished` means that participant
+has ended their part of the meetup. The meetup becomes `completed` after the
+last joined/attended participant finishes. Possible `request_participant.status` values
 are `pending`, `accepted`, `rejected`, and `cancelled`.
 
 Errors: `400` missing/invalid meetup ID or missing identity, `404` meetup not
