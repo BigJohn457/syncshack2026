@@ -19,8 +19,11 @@ class MatchmakingService:
             "instruction": (
                 "Score each possible match from 0 to 100 for friendship and meetup "
                 "compatibility. Use interests, personality, preferred meetup, conversation "
-                "topics and reliability. Return JSON only with a scores array containing "
-                "user_id and integer score. Never invent user IDs."
+                "topics and reliability. For every candidate, include exactly three short, "
+                "specific reasons explaining the strongest compatibility signals. Return "
+                "JSON only in this shape: {\"scores\": [{\"user_id\": \"...\", "
+                "\"score\": 0, \"reasons\": [\"...\", \"...\", \"...\"]}]}. "
+                "Never invent user IDs or profile facts."
             ),
             "person_to_match": person_to_match,
             "possible_matches": possible_matches,
@@ -63,7 +66,16 @@ class MatchmakingService:
                 score = max(0, min(100, int(item["score"])))
             except (KeyError, TypeError, ValueError):
                 continue
-            scores.append({"user_id": user_id, "score": score})
+            raw_reasons = item.get("reasons")
+            reasons = []
+            if isinstance(raw_reasons, list):
+                for reason in raw_reasons:
+                    text = str(reason).strip()
+                    if text and text not in reasons:
+                        reasons.append(text[:160])
+                    if len(reasons) == 3:
+                        break
+            scores.append({"user_id": user_id, "score": score, "reasons": reasons})
         if not scores:
             raise MatchmakingServiceError("matchmaking returned no valid scores")
         return max(scores, key=lambda item: item["score"])

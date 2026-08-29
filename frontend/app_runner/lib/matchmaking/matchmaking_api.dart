@@ -7,9 +7,14 @@ import '../auth/auth_api.dart';
 import '../auth/http_client.dart';
 
 class MatchmakingResult {
-  const MatchmakingResult({required this.userId, required this.score});
+  const MatchmakingResult({
+    required this.userId,
+    required this.score,
+    required this.reasons,
+  });
   final String userId;
   final int score;
+  final List<String> reasons;
 }
 
 class MatchmakingApi {
@@ -36,6 +41,11 @@ class MatchmakingApi {
     return MatchmakingResult(
       userId: userId,
       score: (data['score'] as num?)?.toInt() ?? 0,
+      reasons: (data['reasons'] as List<dynamic>? ?? const [])
+          .map((reason) => reason.toString().trim())
+          .where((reason) => reason.isNotEmpty)
+          .take(3)
+          .toList(growable: false),
     );
   }
 

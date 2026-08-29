@@ -334,7 +334,9 @@ class _HomePageState extends State<HomePage> {
           break;
         }
       }
-      if (pin != null) _showMatchmakingPrompt(pin, result.score);
+      if (pin != null) {
+        _showMatchmakingPrompt(pin, result.score, result.reasons);
+      }
     } on AuthException {
       // Background matchmaking must not interrupt normal map use.
     } finally {
@@ -346,15 +348,86 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _showMatchmakingPrompt(MapPinData pin, int score) {
+  void _showMatchmakingPrompt(MapPinData pin, int score, List<String> reasons) {
+    final displayedReasons = reasons.isEmpty
+        ? <String>['Your profiles show strong meetup compatibility.']
+        : reasons;
     showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Great meetup match'),
-        content: Text(
-          '${pin.title.replaceAll('\n', ' ')} is a $score% personality match. '
-          'Would you like to join?',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
+        title: const Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: Color(0xFFEDE7FF),
+              child: Icon(Icons.auto_awesome, color: Color(0xFF6C3EE8)),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Matchmaking found!',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEDE7FF),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Text(
+                  '$score% matched',
+                  style: const TextStyle(
+                    color: Color(0xFF5A25E6),
+                    fontSize: 25,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              pin.title.replaceAll('\n', ' '),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'What matched',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            ...displayedReasons.map(
+              (reason) => Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '•  ',
+                      style: TextStyle(
+                        color: Color(0xFF6C3EE8),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Expanded(child: Text(reason)),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -447,7 +520,7 @@ class _HomePageState extends State<HomePage> {
                   Text(
                     _loadingRequests
                         ? 'Loading nearby requests...'
-                        : '${_pins.length} nearby request${_pins.length == 1 ? '' : 's'}',
+                        : '${_pins.length} nearby meet up request${_pins.length == 1 ? '' : 's'}',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -1367,16 +1440,38 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _acceptInvitation(MapPinData pin) async {
+    if (_joiningRequestId != null) return;
     setState(() => _joiningRequestId = pin.id);
+    final navigator = Navigator.of(context);
+    final loadingRoute = DialogRoute<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: Text('Joining meetup…'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LinearProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Accepting the invitation. Please wait.'),
+            ],
+          ),
+        ),
+      ),
+    );
+    unawaited(navigator.push(loadingRoute));
     try {
       final joined = await _meetupRequestsApi.join(pin.id);
       if (joined.invitationStatus != 'accepted') {
         await _meetupApi.acceptInvitation(joined.meetupId);
       }
       if (!mounted) return;
-      Navigator.pop(context);
-      Navigator.push(
-        context,
+      if (loadingRoute.isActive) navigator.removeRoute(loadingRoute);
+      navigator.pop();
+      navigator.push(
         MaterialPageRoute<void>(
           builder: (_) => ChatPage(
             activity: pin.title.replaceAll('\n', ' '),
@@ -1387,12 +1482,14 @@ class _HomePageState extends State<HomePage> {
       );
     } on AuthException catch (error) {
       if (mounted) {
-        Navigator.pop(context);
+        if (loadingRoute.isActive) navigator.removeRoute(loadingRoute);
+        navigator.pop();
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));
       }
     } finally {
+      if (loadingRoute.isActive) navigator.removeRoute(loadingRoute);
       if (mounted) setState(() => _joiningRequestId = null);
     }
   }

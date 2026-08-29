@@ -14,7 +14,15 @@ void main() {
         return http.Response(
           jsonEncode({
             'success': true,
-            'data': {'user_id': 'user-3', 'score': 91},
+            'data': {
+              'user_id': 'user-3',
+              'score': 91,
+              'reasons': [
+                'Shared interest in hiking',
+                'Similar social energy',
+                'Both prefer weekend meetups',
+              ],
+            },
           }),
           200,
         );
@@ -33,5 +41,10 @@ void main() {
     });
     expect(result?.userId, 'user-3');
     expect(result?.score, 91);
+    expect(result?.reasons, [
+      'Shared interest in hiking',
+      'Similar social energy',
+      'Both prefer weekend meetups',
+    ]);
   });
 }

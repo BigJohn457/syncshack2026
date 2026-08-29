@@ -15,8 +15,20 @@ class FakeResponse:
                         "content": json.dumps(
                             {
                                 "scores": [
-                                    {"user_id": "user-2", "score": 74},
-                                    {"user_id": "user-3", "score": 91},
+                                    {
+                                        "user_id": "user-2",
+                                        "score": 74,
+                                        "reasons": ["Both enjoy coffee meetups"],
+                                    },
+                                    {
+                                        "user_id": "user-3",
+                                        "score": 91,
+                                        "reasons": [
+                                            "Shared interest in hiking",
+                                            "Similar social energy",
+                                            "Both prefer weekend meetups",
+                                        ],
+                                    },
                                 ]
                             }
                         )
@@ -37,4 +49,12 @@ def test_returns_only_highest_valid_deepseek_score(monkeypatch):
         [{"user_id": "user-2"}, {"user_id": "user-3"}],
     )
 
-    assert result == {"user_id": "user-3", "score": 91}
+    assert result == {
+        "user_id": "user-3",
+        "score": 91,
+        "reasons": [
+            "Shared interest in hiking",
+            "Similar social energy",
+            "Both prefer weekend meetups",
+        ],
+    }
