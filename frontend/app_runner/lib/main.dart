@@ -73,6 +73,8 @@ class _HomePageState extends State<HomePage> {
   bool _loadingRequests = false;
   String? _mapError;
   Timer? _zoomDebounce;
+  Timer? _requestsPollTimer;
+  bool _pollInProgress = false;
   int _requestGeneration = 0;
 
   List<MapPinData> _pins = const [];
@@ -96,6 +98,10 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _loadPhoneLocation();
     _loadProfileSummary();
+    _requestsPollTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _pollNearbyRequests(),
+    );
   }
 
   Future<void> _loadProfileSummary() async {
@@ -116,7 +122,18 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _zoomDebounce?.cancel();
+    _requestsPollTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _pollNearbyRequests() async {
+    if (_pollInProgress || _loadingRequests || _searchCenter == null) return;
+    _pollInProgress = true;
+    try {
+      await _fetchNearbyRequests(silent: true);
+    } finally {
+      _pollInProgress = false;
+    }
   }
 
   Future<void> _loadPhoneLocation() async {
@@ -167,14 +184,20 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _fetchNearbyRequests({LatLng? center, double? radiusKm}) async {
+  Future<void> _fetchNearbyRequests({
+    LatLng? center,
+    double? radiusKm,
+    bool silent = false,
+  }) async {
     final searchCenter = center ?? _searchCenter ?? _userLocation;
     if (searchCenter == null) return;
     final searchRadius = radiusKm ?? _radiusKm;
     final generation = ++_requestGeneration;
     setState(() {
-      _loadingRequests = true;
-      _mapError = null;
+      if (!silent) {
+        _loadingRequests = true;
+        _mapError = null;
+      }
       _searchCenter = searchCenter;
       _radiusKm = searchRadius;
     });
@@ -207,11 +230,11 @@ class _HomePageState extends State<HomePage> {
         }).toList();
       });
     } on AuthException catch (error) {
-      if (mounted && generation == _requestGeneration) {
+      if (!silent && mounted && generation == _requestGeneration) {
         setState(() => _mapError = error.message);
       }
     } finally {
-      if (mounted && generation == _requestGeneration) {
+      if (!silent && mounted && generation == _requestGeneration) {
         setState(() => _loadingRequests = false);
       }
     }
