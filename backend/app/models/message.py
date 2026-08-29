@@ -36,3 +36,27 @@ class MeetupMessage:
             "message": self.message,
             "created_at": created_at.astimezone(ZoneInfo(timezone_name)).isoformat(),
         }
+
+
+@dataclass(frozen=True)
+class MessageSubmission:
+    meetup_id: str
+    message: str
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "MessageSubmission":
+        if not isinstance(data, dict):
+            raise ValueError("request body must be a JSON object")
+
+        meetup_id = str(data.get("meetup_id", "")).strip()
+        message = str(data.get("message", "")).strip()
+        if not meetup_id:
+            raise ValueError("meetup_id is required")
+        if len(meetup_id) > 36:
+            raise ValueError("meetup_id cannot exceed 36 characters")
+        if not message:
+            raise ValueError("message is required")
+        if len(message) > 5000:
+            raise ValueError("message cannot exceed 5000 characters")
+
+        return cls(meetup_id=meetup_id, message=message)

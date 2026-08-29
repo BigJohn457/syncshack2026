@@ -144,6 +144,62 @@ def test_get_all_messages_returns_sender_details(monkeypatch):
     }
 
 
+def test_send_message_requires_user_identity():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post("/api/meetup-chat/post/send-message", json={})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "X-User-ID header is required"
+
+
+def test_send_message_returns_created_message(monkeypatch):
+    import importlib
+
+    chat_routes = importlib.import_module("app.routes.meetup_chat")
+    monkeypatch.setattr(
+        chat_routes.meetup_chat_repository,
+        "create_message",
+        lambda sender_id, submission: MeetupMessage(
+            id="msg-001",
+            sender_id=sender_id,
+            sender=MessageSender(
+                "Blue Panda", "https://example.com/avatar1.jpg"
+            ),
+            message=submission.message,
+            created_at=datetime(2026, 8, 29, 2, 25, 14),
+        ),
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/meetup-chat/post/send-message",
+            json={"meetup_id": "meetup-001", "message": "Hello everyone!"},
+            headers={"X-User-ID": "user-123"},
+        )
+
+    assert response.status_code == 201
+    assert response.get_json() == {
+        "success": True,
+        "message": "Message sent successfully",
+        "data": {
+            "meetup_id": "meetup-001",
+            "message": {
+                "id": "msg-001",
+                "sender_id": "user-123",
+                "sender": {
+                    "anonymous_name": "Blue Panda",
+                    "img_url": "https://example.com/avatar1.jpg",
+                },
+                "message": "Hello everyone!",
+                "created_at": "2026-08-29T12:25:14+10:00",
+            },
+        },
+    }
+
+
 def test_get_own_profile_requires_id():
     app = create_app("testing")
 

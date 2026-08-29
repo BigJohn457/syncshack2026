@@ -5,7 +5,11 @@ from .auth_repository import (
     EmailAlreadyExistsError,
     InvalidCredentialsError,
 )
-from .meetup_chat_repository import MeetupChatRepository, MeetupNotFoundError
+from .meetup_chat_repository import (
+    ChatAccessDeniedError,
+    MeetupChatRepository,
+    MeetupNotFoundError,
+)
 from .request_repository import RequestNotFoundError, RequestRepository, UserNotFoundError
 from .rating_repository import (
     DuplicateRatingError,
@@ -18,6 +22,7 @@ from .user_repository import UserRepository
 
 __all__ = [
     "MeetupChatRepository",
+    "ChatAccessDeniedError",
     "AuthRepository",
     "EmailAlreadyExistsError",
     "InvalidCredentialsError",
