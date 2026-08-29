@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from mysql.connector import Error as MySQLError, IntegrityError
 
 from app.models import UserProfileUpdate
@@ -42,7 +42,9 @@ def get_own_profile():
 
 @users.post("/post/edit-profile")
 def edit_own_profile():
-    user_id = request.headers.get("X-User-ID", "").strip()
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
     if not user_id:
         return jsonify(success=False, error="X-User-ID header is required"), 400
 

@@ -1,5 +1,10 @@
 """Repositories containing application and data-access logic."""
 
+from .auth_repository import (
+    AuthRepository,
+    EmailAlreadyExistsError,
+    InvalidCredentialsError,
+)
 from .meetup_chat_repository import MeetupChatRepository, MeetupNotFoundError
 from .request_repository import RequestNotFoundError, RequestRepository, UserNotFoundError
 from .rating_repository import (
@@ -13,6 +18,9 @@ from .user_repository import UserRepository
 
 __all__ = [
     "MeetupChatRepository",
+    "AuthRepository",
+    "EmailAlreadyExistsError",
+    "InvalidCredentialsError",
     "MeetupNotFoundError",
     "ProfileUserNotFoundError",
     "DuplicateRatingError",

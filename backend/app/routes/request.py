@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from flask import Blueprint, jsonify, request as flask_request
+from flask import Blueprint, jsonify, request as flask_request, session
 from mysql.connector import Error as MySQLError
 
 from app.models import MeetupRequest
@@ -64,7 +64,9 @@ def get_all_nearby_requests():
 
 @request.post("/post/submit-request")
 def submit_request():
-    creator_id = flask_request.headers.get("X-User-ID", "").strip()
+    creator_id = str(
+        session.get("user_id") or flask_request.headers.get("X-User-ID", "")
+    ).strip()
     if not creator_id:
         return jsonify(success=False, error="X-User-ID header is required"), 400
 

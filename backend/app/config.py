@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -25,6 +26,9 @@ class Config:
         os.getenv("DB_SSL_CA", "ca-certificate (10).crt")
     )
     API_TIMEZONE = os.getenv("API_TIMEZONE", "Australia/Sydney")
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    PERMANENT_SESSION_LIFETIME = timedelta(days=7)
 
 
 class DevelopmentConfig(Config):
@@ -37,6 +41,7 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+    SESSION_COOKIE_SECURE = True
 
 
 config_by_name = {

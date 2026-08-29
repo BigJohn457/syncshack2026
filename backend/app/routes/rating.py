@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from mysql.connector import Error as MySQLError
 
 from app.models import RatingSubmission
@@ -20,7 +20,9 @@ def list_ratings():
 
 @rating.post("/post/submit-rating")
 def submit_rating():
-    from_user_id = request.headers.get("X-User-ID", "").strip()
+    from_user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
     if not from_user_id:
         return jsonify(success=False, error="X-User-ID header is required"), 400
 
