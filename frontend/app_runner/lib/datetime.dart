@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'searching.dart';
 
 // "hey!" brand palette
 const _kPurple = Color(0xFF7C4DFF);
@@ -133,14 +134,34 @@ class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
                   ),
                   const SizedBox(height: 28),
                   _RequestMeetupButton(
-                    onPressed: () => widget.onRequestMeetup?.call(
-                      _activityController.text,
-                      _peopleController.text,
-                      _placeController.text,
-                      _hour,
-                      _minute,
-                      _isAm,
-                    ),
+                    onPressed: () {
+                      widget.onRequestMeetup?.call(
+                        _activityController.text,
+                        _peopleController.text,
+                        _placeController.text,
+                        _hour,
+                        _minute,
+                        _isAm,
+                      );
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SearchingPage(
+                            activity: _activityController.text.isNotEmpty
+                                ? _activityController.text
+                                : 'Grab coffee ☕',
+                            people: _peopleController.text.isNotEmpty
+                                ? _peopleController.text
+                                : '2',
+                            place: _placeController.text.isNotEmpty
+                                ? _placeController.text
+                                : 'Sydney CBD',
+                            time:
+                                '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')} ${_isAm ? "AM" : "PM"}',
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
