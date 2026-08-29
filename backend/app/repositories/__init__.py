@@ -1,7 +1,7 @@
 """Repositories containing application and data-access logic."""
 
 from .meetup_chat_repository import MeetupChatRepository, MeetupNotFoundError
-from .request_repository import RequestRepository, UserNotFoundError
+from .request_repository import RequestNotFoundError, RequestRepository, UserNotFoundError
 from .rating_repository import (
     DuplicateRatingError,
     RatingEligibilityError,
@@ -18,6 +18,7 @@ __all__ = [
     "DuplicateRatingError",
     "RatingEligibilityError",
     "RatingRepository",
+    "RequestNotFoundError",
     "RequestRepository",
     "SystemRepository",
     "UserNotFoundError",

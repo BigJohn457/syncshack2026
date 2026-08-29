@@ -10,10 +10,56 @@ request = Blueprint("request", __name__, url_prefix="/request")
 request_repository = RequestRepository()
 
 
+def _read_float(name: str, body: dict):
+    value = flask_request.args.get(name)
+    if value is None:
+        value = body.get(name)
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be a number") from None
+
+
 @request.get("")
 def list_requests():
     """Return requests. Connect this route to a request repository."""
     return jsonify(requests=[]), 200
+
+
+@request.get("/get/all-request")
+def get_all_nearby_requests():
+    body = flask_request.get_json(silent=True) or {}
+    try:
+        longitude = _read_float("longitude", body)
+        latitude = _read_float("latitude", body)
+        radius = _read_float("radius", body)
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
+
+    if longitude is None or latitude is None or radius is None:
+        return jsonify(
+            success=False, error="longitude, latitude, and radius are required"
+        ), 400
+    if not -90 <= latitude <= 90:
+        return jsonify(success=False, error="latitude must be between -90 and 90"), 400
+    if not -180 <= longitude <= 180:
+        return jsonify(
+            success=False, error="longitude must be between -180 and 180"
+        ), 400
+    if radius < 0:
+        return jsonify(success=False, error="radius must be greater than or equal to 0"), 400
+
+    try:
+        nearby_requests = request_repository.find_nearby(latitude, longitude, radius)
+    except MySQLError:
+        return jsonify(success=False, error="database operation failed"), 500
+
+    return jsonify(
+        success=True,
+        data=[meetup_request.to_dict() for meetup_request in nearby_requests],
+    ), 200
 
 
 @request.post("/post/submit-request")

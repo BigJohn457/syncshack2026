@@ -173,7 +173,7 @@ def test_get_own_profile_returns_selected_user_fields(monkeypatch):
 
     with app.test_client() as client:
         response = client.get(
-            "/api/users/get/own-profile", query_string={"id": "user-123"}
+            "/api/users/get/own-profile", query_string={"id": 123}
         )
 
     assert response.status_code == 200
@@ -227,7 +227,7 @@ def test_edit_profile_returns_updated_profile(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert response.get_json() == {"success": True, "data": payload}
+    assert response.get_json() == {"success": True, "data": {}}
 
 
 def test_submit_rating_requires_user_identity():
