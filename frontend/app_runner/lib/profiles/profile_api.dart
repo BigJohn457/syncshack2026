@@ -15,6 +15,7 @@ class UserProfile {
     required this.radius,
     this.profileImageUrl,
     this.personalizationAnswers = const {},
+    this.matchmaking = false,
   });
 
   final String firstName;
@@ -24,6 +25,7 @@ class UserProfile {
   final double radius;
   final String? profileImageUrl;
   final Map<String, String> personalizationAnswers;
+  final bool matchmaking;
   bool get hasPersonalization =>
       personalizationAnswers.length >= 5 &&
       personalizationAnswers.values.every((value) => value.trim().isNotEmpty);
@@ -42,6 +44,7 @@ class UserProfile {
             (key, value) => MapEntry(key.toString(), value.toString()),
           ) ??
           const {},
+      matchmaking: json['matchmaking'] == 1 || json['matchmaking'] == true,
     );
   }
 }

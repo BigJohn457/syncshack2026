@@ -27,7 +27,7 @@ class UserRepository:
                     phone,
                     radius,
                     profile_image_url
-                    , personalization_answers
+                    , personalization_answers, matchmaking
                 FROM users
                 WHERE id = %s
                 LIMIT 1
@@ -48,6 +48,7 @@ class UserRepository:
                 personalization_answers=self._answers(
                     row.get("personalization_answers")
                 ),
+                matchmaking=int(row.get("matchmaking") or 0),
             )
         finally:
             cursor.close()
@@ -188,6 +189,55 @@ class UserRepository:
         except Exception:
             connection.rollback()
             raise
+        finally:
+            cursor.close()
+            connection.close()
+
+    def set_matchmaking(self, user_id: str, enabled: bool) -> None:
+        connection = self.connection_factory()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                "UPDATE users SET matchmaking = %s WHERE id = %s",
+                (1 if enabled else 0, user_id),
+            )
+            if cursor.rowcount == 0:
+                raise UserNotFoundError(user_id)
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            cursor.close()
+            connection.close()
+
+    def get_matchmaking_profiles(self, user_ids: list[str]) -> list[dict]:
+        if not user_ids:
+            return []
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            placeholders = ", ".join(["%s"] * len(user_ids))
+            cursor.execute(
+                f"""
+                SELECT id, first_name, last_name, radius,
+                       reliability_score, personalization_answers
+                FROM users WHERE id IN ({placeholders})
+                """,
+                tuple(user_ids),
+            )
+            return [
+                {
+                    "user_id": row["id"],
+                    "name": f"{row['first_name'] or ''} {row['last_name'] or ''}".strip(),
+                    "radius": float(row["radius"] or 0),
+                    "reliability_score": float(row["reliability_score"] or 0),
+                    "personalization_answers": self._answers(
+                        row.get("personalization_answers")
+                    ),
+                }
+                for row in cursor.fetchall()
+            ]
         finally:
             cursor.close()
             connection.close()

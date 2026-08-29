@@ -777,6 +777,19 @@ are `pending`, `accepted`, `rejected`, and `cancelled`.
 Errors: `400` missing/invalid meetup ID or missing identity, `404` meetup not
 found, `500` database error.
 
+### AI matchmaking
+
+`POST /api/users/post/matchmaking-toggle` accepts `{ "enabled": true }` and
+persists `users.matchmaking` as `1` or `0`. New and existing users default to
+off and must opt in before profile data is sent to DeepSeek.
+
+`POST /api/users/post/matchmaking` accepts the authenticated user's ID as
+`current_user_id` and nearby candidate IDs as `user_ids`. The server fetches
+all profiles, sends separate `person_to_match` and `possible_matches` objects
+to DeepSeek V4 Flash, validates its JSON scores, and returns only the highest scoring
+`{ "user_id": "...", "score": 0-100 }` object. Configure `DEEPSEEK_API_KEY`
+and optionally `DEEPSEEK_MODEL` in the backend environment.
+
 ### Accept a meetup invitation
 
 ```http

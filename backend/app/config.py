@@ -44,6 +44,8 @@ class Config:
     MAX_IMAGE_UPLOAD_BYTES = int(
         os.getenv("MAX_IMAGE_UPLOAD_BYTES", str(10 * 1024 * 1024))
     )
+    DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+    DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 
 class DevelopmentConfig(Config):

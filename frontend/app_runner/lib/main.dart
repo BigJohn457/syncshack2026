@@ -14,6 +14,7 @@ import 'datetime.dart';
 import 'edit_profile.dart';
 import 'map_style.dart';
 import 'meetups/meetup_api.dart';
+import 'matchmaking/matchmaking_api.dart';
 import 'profiles/profile_api.dart';
 import 'profile_questions.dart';
 import 'requests/nearby_requests_api.dart';
@@ -59,6 +60,10 @@ class _HomePageState extends State<HomePage> {
   String? _selectedPinId;
   String _userName = '';
   bool _profileQuestionsRequired = false;
+  bool _matchmakingEnabled = false;
+  bool _matchmakingInProgress = false;
+  final Set<String> _seenMatchRequestIds = {};
+  final Set<String> _rejectedMatchRequestIds = {};
   String _userStatus = '';
 
   // Map Controller for interactive moving/zooming
@@ -66,6 +71,7 @@ class _HomePageState extends State<HomePage> {
   final NearbyRequestsApi _nearbyRequestsApi = NearbyRequestsApi();
   final MeetupRequestsApi _meetupRequestsApi = MeetupRequestsApi();
   final MeetupApi _meetupApi = MeetupApi();
+  final MatchmakingApi _matchmakingApi = MatchmakingApi();
   String? _joiningRequestId;
   static const LatLng _fallbackCenter = LatLng(-33.8688, 151.2093);
   static const double _defaultRadiusKm = 2;
@@ -117,7 +123,11 @@ class _HomePageState extends State<HomePage> {
         setState(() {
           _userName = '${profile.firstName} ${profile.lastName}'.trim();
           _profileQuestionsRequired = !profile.hasPersonalization;
+          _matchmakingEnabled = profile.matchmaking;
         });
+        if (profile.matchmaking && _searchCenter != null) {
+          await _fetchNearbyRequests(silent: true);
+        }
       }
     } on AuthException {
       // The edit profile screen exposes retry/error details.
@@ -231,9 +241,11 @@ class _HomePageState extends State<HomePage> {
             description:
                 '${request.placeName} • ${request.minPeople}-${request.maxPeople} people',
             meetupId: request.meetupId,
+            creatorId: request.creatorId,
           );
         }).toList();
       });
+      await _checkNewMatches(requests);
     } on AuthException catch (error) {
       if (!silent && mounted && generation == _requestGeneration) {
         setState(() => _mapError = error.message);
@@ -243,6 +255,97 @@ class _HomePageState extends State<HomePage> {
         setState(() => _loadingRequests = false);
       }
     }
+  }
+
+  Future<void> _setMatchmakingEnabled(bool enabled) async {
+    final previous = _matchmakingEnabled;
+    setState(() => _matchmakingEnabled = enabled);
+    try {
+      await _matchmakingApi.setEnabled(enabled);
+      if (enabled) {
+        _seenMatchRequestIds.clear();
+        await _fetchNearbyRequests(silent: true);
+      }
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      setState(() => _matchmakingEnabled = previous);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _checkNewMatches(List<NearbyRequest> requests) async {
+    if (!_matchmakingEnabled || _matchmakingInProgress) return;
+    final currentUserId = AuthSession.currentUserId;
+    if (currentUserId == null || currentUserId.isEmpty) return;
+    final newRequests = requests
+        .where(
+          (request) =>
+              request.creatorId != currentUserId &&
+              !_seenMatchRequestIds.contains(request.id) &&
+              !_rejectedMatchRequestIds.contains(request.id),
+        )
+        .toList();
+    if (newRequests.isEmpty) return;
+    _seenMatchRequestIds.addAll(newRequests.map((request) => request.id));
+    _matchmakingInProgress = true;
+    try {
+      final result = await _matchmakingApi.bestMatch(
+        currentUserId: currentUserId,
+        userIds: newRequests.map((request) => request.creatorId).toList(),
+      );
+      if (!mounted || !_matchmakingEnabled || result == null) return;
+      NearbyRequest? matchedRequest;
+      for (final request in newRequests) {
+        if (request.creatorId == result.userId) {
+          matchedRequest = request;
+          break;
+        }
+      }
+      if (matchedRequest == null) return;
+      MapPinData? pin;
+      for (final item in _pins) {
+        if (item.id == matchedRequest.id) {
+          pin = item;
+          break;
+        }
+      }
+      if (pin != null) _showMatchmakingPrompt(pin, result.score);
+    } on AuthException {
+      // Background matchmaking must not interrupt normal map use.
+    } finally {
+      _matchmakingInProgress = false;
+    }
+  }
+
+  void _showMatchmakingPrompt(MapPinData pin, int score) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Great meetup match'),
+        content: Text(
+          '${pin.title.replaceAll('\n', ' ')} is a $score% personality match. '
+          'Would you like to join?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _rejectedMatchRequestIds.add(pin.id);
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('Reject'),
+          ),
+          ElevatedButton(
+            onPressed: _joiningRequestId == pin.id
+                ? null
+                : () => _acceptInvitation(pin),
+            child: const Text('Accept'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatMeetTime(DateTime? time) {
@@ -552,36 +655,51 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
 
-        GestureDetector(
-          onTap: _showNotificationsSheet,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Color(0xFF222038),
-                  size: 28,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Switch(
+                  value: _matchmakingEnabled,
+                  onChanged: _setMatchmakingEnabled,
                 ),
-              ),
-              Positioned(
-                right: 6,
-                top: 5,
-                child: Container(
-                  width: 8.5,
-                  height: 8.5,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF6C3EE8),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 1.5),
+                const Text('Matchmaking', style: TextStyle(fontSize: 10)),
+              ],
+            ),
+            GestureDetector(
+              onTap: _showNotificationsSheet,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Color(0xFF222038),
+                      size: 28,
+                    ),
                   ),
-                ),
+                  Positioned(
+                    right: 6,
+                    top: 5,
+                    child: Container(
+                      width: 8.5,
+                      height: 8.5,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6C3EE8),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
@@ -1597,6 +1715,7 @@ class MapPinData {
   final String distance;
   final String description;
   final String? meetupId;
+  final String creatorId;
 
   const MapPinData({
     required this.id,
@@ -1608,6 +1727,7 @@ class MapPinData {
     this.distance = '0.5 km away',
     this.description = 'Looking for someone to meetup right now!',
     this.meetupId,
+    this.creatorId = '',
   });
 }
 

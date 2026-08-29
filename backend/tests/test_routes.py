@@ -411,9 +411,10 @@ def test_get_own_profile_returns_selected_user_fields(monkeypatch):
             "last_name": "Panda",
             "email": "blue@example.com",
             "phone": "0400000000",
-            "radius": 5.5,
+                "radius": 5.5,
                 "profile_image_url": "https://example.com/avatar.jpg",
                 "personalization_answers": None,
+                "matchmaking": 0,
             },
     }
 
