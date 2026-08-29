@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from mysql.connector import Error as MySQLError, IntegrityError
 
 from app.models import UserProfileUpdate
@@ -21,11 +21,16 @@ def get_own_profile():
     if user_id is None:
         user_id = body.get("id")
 
-    if not isinstance(user_id, (str, int)) or not str(user_id).strip():
+    if user_id is None or user_id == "":
         return jsonify(success=False, error="id is required"), 400
 
     try:
-        profile = user_repository.get_profile(str(user_id).strip())
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        return jsonify(success=False, error="id must be an integer"), 400
+
+    try:
+        profile = user_repository.get_profile(user_id)
     except MySQLError:
         return jsonify(success=False, error="database operation failed"), 500
 
@@ -37,13 +42,15 @@ def get_own_profile():
 
 @users.post("/post/edit-profile")
 def edit_own_profile():
-    user_id = request.headers.get("X-User-ID", "").strip()
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
     if not user_id:
         return jsonify(success=False, error="X-User-ID header is required"), 400
 
     try:
         update = UserProfileUpdate.from_dict(request.get_json(silent=True))
-        profile = user_repository.update_profile(user_id, update)
+        user_repository.update_profile(user_id, update)
     except ValueError as exc:
         return jsonify(success=False, error=str(exc)), 400
     except ProfileUserNotFoundError:
@@ -55,4 +62,4 @@ def edit_own_profile():
     except MySQLError:
         return jsonify(success=False, error="database operation failed"), 500
 
-    return jsonify(success=True, data=profile.to_dict()), 200
+    return jsonify(success=True, data={}), 200

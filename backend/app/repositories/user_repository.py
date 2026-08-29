@@ -12,7 +12,7 @@ class UserRepository:
     def __init__(self, connection_factory: Callable = get_db_connection):
         self.connection_factory = connection_factory
 
-    def get_profile(self, user_id: str) -> UserProfile | None:
+    def get_profile(self, user_id: int) -> UserProfile | None:
         connection = self.connection_factory()
         cursor = connection.cursor(dictionary=True)
 
@@ -44,6 +44,68 @@ class UserRepository:
                 radius=float(row["radius"]) if row["radius"] is not None else None,
                 profile_image_url=row["profile_image_url"],
             )
+        finally:
+            cursor.close()
+            connection.close()
+
+    def get_shared_profile(self, user_id: int) -> dict | None:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    first_name,
+                    last_name,
+                    profile_image_url,
+                    reliability_score
+                FROM users
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+
+            return {
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "profile_image_url": row["profile_image_url"],
+                "reliability_score": float(row["reliability_score"]),
+            }
+        finally:
+            cursor.close()
+            connection.close()
+
+    def get_anonymous_profile(self, user_id: int) -> dict | None:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    anonymous_name,
+                    profile_image_url,
+                    reliability_score
+                FROM users
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+
+            return {
+                "anonymous_name": row["anonymous_name"],
+                "profile_image_url": row["profile_image_url"],
+                "reliability_score": float(row["reliability_score"]),
+            }
         finally:
             cursor.close()
             connection.close()

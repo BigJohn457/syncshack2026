@@ -1,11 +1,32 @@
 import json
 from collections.abc import Callable
+from math import asin, cos, radians, sin, sqrt
 
 from app.database import get_db_connection
 from app.models import MeetupRequest
 
+EARTH_RADIUS_KM = 6371.0
+
+
+def haversine_km(
+    latitude_1: float, longitude_1: float, latitude_2: float, longitude_2: float
+) -> float:
+    delta_latitude = radians(latitude_2 - latitude_1)
+    delta_longitude = radians(longitude_2 - longitude_1)
+    origin_latitude = radians(latitude_1)
+    target_latitude = radians(latitude_2)
+    chord = (
+        sin(delta_latitude / 2) ** 2
+        + cos(origin_latitude) * cos(target_latitude) * sin(delta_longitude / 2) ** 2
+    )
+    return 2 * EARTH_RADIUS_KM * asin(sqrt(chord))
+
 
 class UserNotFoundError(Exception):
+    pass
+
+
+class RequestNotFoundError(Exception):
     pass
 
 
@@ -50,6 +71,108 @@ class RequestRepository:
         except Exception:
             connection.rollback()
             raise
+        finally:
+            cursor.close()
+            connection.close()
+
+    def find_nearby(
+        self, latitude: float, longitude: float, radius: float
+    ) -> list[MeetupRequest]:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    request_id, creator_id, title, location, min_people,
+                    max_people, meet_time, expires_at, status
+                FROM requests
+                WHERE status = 'open'
+                """
+            )
+            nearby: list[MeetupRequest] = []
+            for row in cursor.fetchall():
+                meetup_request = MeetupRequest.from_row(row)
+                distance = haversine_km(
+                    latitude,
+                    longitude,
+                    meetup_request.location.latitude,
+                    meetup_request.location.longitude,
+                )
+                if distance <= radius:
+                    nearby.append(meetup_request)
+            return nearby
+        finally:
+            cursor.close()
+            connection.close()
+
+    def get_details(self, request_id: int) -> dict:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    u.anonymous_name,
+                    u.reliability_score,
+                    r.location,
+                    r.min_people,
+                    r.max_people,
+                    r.meet_time,
+                    r.expires_at
+                FROM requests AS r
+                JOIN users AS u ON u.id = r.creator_id
+                WHERE r.request_id = %s
+                LIMIT 1
+                """,
+                (request_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise RequestNotFoundError(request_id)
+
+            location = row["location"]
+            if isinstance(location, str):
+                try:
+                    location = json.loads(location)
+                except json.JSONDecodeError:
+                    pass
+            if isinstance(location, dict):
+                location = location.get("place_name", "")
+
+            return {
+                "anonymous_name": row["anonymous_name"],
+                "reliability_score": float(row["reliability_score"]),
+                "location": location,
+                "min_people": int(row["min_people"]),
+                "max_people": int(row["max_people"]),
+                "meet_time": row["meet_time"].isoformat(),
+                "expires_at": row["expires_at"].isoformat(),
+            }
+        finally:
+            cursor.close()
+            connection.close()
+
+    def get_own_request(self, request_id: int) -> dict:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                "SELECT location FROM requests WHERE request_id = %s LIMIT 1",
+                (request_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise RequestNotFoundError(request_id)
+
+            location = row["location"]
+            if isinstance(location, str):
+                location = json.loads(location)
+
+            return {"location": location}
         finally:
             cursor.close()
             connection.close()

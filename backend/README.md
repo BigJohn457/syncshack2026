@@ -46,8 +46,13 @@ The route modules and their base endpoints are:
 | `request.py` | `/api/request` |
 | `meetup_chat.py` | `/api/meetup-chat` |
 | `meetup.py` | `/api/meetups` |
-| `rating.py` | `/api/ratings` |
+| `rating.py` | `/api/rating` |
 | `users.py` | `/api/users` |
+| `auth.py` | `/api/auth` |
+
+Authentication uses an HTTP-only signed session cookie. Frontend requests must
+include credentials so the browser stores and sends the cookie. Passwords are
+stored as salted one-way hashes, never as plaintext.
 
 ## Test
 

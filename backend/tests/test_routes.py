@@ -1,5 +1,6 @@
 from app import create_app
 from app.models import (
+    AuthenticatedUser,
     MeetupMessage,
     MeetupRequest,
     MessageSender,
@@ -35,7 +36,7 @@ def test_feature_routes_are_registered_separately():
         "/api/request": {"requests": []},
         "/api/meetup-chat": {"meetup_chats": []},
         "/api/meetups": {"meetups": []},
-        "/api/ratings": {"ratings": []},
+        "/api/rating": {"ratings": []},
         "/api/users": {"users": []},
     }
 
@@ -173,7 +174,7 @@ def test_get_own_profile_returns_selected_user_fields(monkeypatch):
 
     with app.test_client() as client:
         response = client.get(
-            "/api/users/get/own-profile", query_string={"id": "user-123"}
+            "/api/users/get/own-profile", query_string={"id": 123}
         )
 
     assert response.status_code == 200
@@ -227,4 +228,119 @@ def test_edit_profile_returns_updated_profile(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert response.get_json() == {"success": True, "data": payload}
+    assert response.get_json() == {"success": True, "data": {}}
+
+
+def test_submit_rating_requires_user_identity():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post("/api/rating/post/submit-rating", json={})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "X-User-ID header is required"
+
+
+def test_submit_rating_returns_contract_response(monkeypatch):
+    import importlib
+
+    rating_routes = importlib.import_module("app.routes.rating")
+    monkeypatch.setattr(
+        rating_routes.rating_repository,
+        "create",
+        lambda from_user_id, submission: None,
+    )
+    app = create_app("testing")
+    payload = {
+        "meetup_id": "meetup_123",
+        "to_user_id": "user_456",
+        "rating": 5,
+    }
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/rating/post/submit-rating",
+            json=payload,
+            headers={"X-User-ID": "user_123"},
+        )
+
+    assert response.status_code == 201
+    assert response.get_json() == {
+        "success": True,
+        "message": "Rating submitted successfully",
+        "data": payload,
+    }
+
+
+def test_signup_creates_user_without_returning_password(monkeypatch):
+    import importlib
+
+    auth_routes = importlib.import_module("app.routes.auth")
+    monkeypatch.setattr(
+        auth_routes.auth_repository,
+        "create_user",
+        lambda signup: AuthenticatedUser(
+            id="user-123",
+            first_name=signup.first_name,
+            last_name=signup.last_name,
+            email=signup.email,
+        ),
+    )
+    app = create_app("testing")
+    payload = {
+        "first_name": "Blue",
+        "last_name": "Panda",
+        "email": "blue@example.com",
+        "password": "strong-password",
+        "phone_number": "0400000000",
+        "id_photo": "https://example.com/id.jpg",
+        "face_photo": "https://example.com/face.jpg",
+    }
+
+    with app.test_client() as client:
+        response = client.post("/api/auth/post/signup", json=payload)
+
+    assert response.status_code == 201
+    assert response.get_json()["data"]["id"] == "user-123"
+    assert "password" not in response.get_json()["data"]
+
+
+def test_login_sets_http_only_session_cookie(monkeypatch):
+    import importlib
+
+    auth_routes = importlib.import_module("app.routes.auth")
+    monkeypatch.setattr(
+        auth_routes.auth_repository,
+        "authenticate",
+        lambda login: AuthenticatedUser(
+            id="user-123",
+            first_name="Blue",
+            last_name="Panda",
+            email=login.email,
+        ),
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/auth/post/login",
+            json={"email": "blue@example.com", "password": "strong-password"},
+        )
+        with client.session_transaction() as flask_session:
+            assert flask_session["user_id"] == "user-123"
+
+    assert response.status_code == 200
+    assert "HttpOnly" in response.headers["Set-Cookie"]
+
+
+def test_logout_clears_session():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        with client.session_transaction() as flask_session:
+            flask_session["user_id"] = "user-123"
+        response = client.post("/api/auth/post/logout")
+        with client.session_transaction() as flask_session:
+            assert "user_id" not in flask_session
+
+    assert response.status_code == 200
