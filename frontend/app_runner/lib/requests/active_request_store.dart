@@ -113,8 +113,6 @@ class ActiveRequestStore {
       throw const AuthException(
         'Could not restore your current meetup stage. Check your connection.',
       );
-    } finally {
-      if (client == null) apiClient.close();
     }
   }
 
