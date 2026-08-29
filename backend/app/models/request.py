@@ -1,3 +1,4 @@
+import json
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any
@@ -84,6 +85,24 @@ class MeetupRequest:
             meet_time=meet_time,
             location=location,
             expires_at=expires_at,
+        )
+
+    @classmethod
+    def from_row(cls, row: dict[str, Any]) -> "MeetupRequest":
+        location_data = row["location"]
+        if isinstance(location_data, str):
+            location_data = json.loads(location_data)
+
+        return cls(
+            request_id=row["request_id"],
+            creator_id=row["creator_id"],
+            title=row["title"],
+            min_people=int(row["min_people"]),
+            max_people=int(row["max_people"]),
+            meet_time=row["meet_time"],
+            location=Location.from_dict(location_data),
+            expires_at=row["expires_at"],
+            status=row.get("status") or "open",
         )
 
     def to_dict(self) -> dict[str, Any]:

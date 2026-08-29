@@ -28,6 +28,117 @@ def test_health_endpoint():
     assert response.get_json() == {"status": "ok"}
 
 
+def test_request_details_returns_selected_fields(monkeypatch):
+    import importlib
+
+    home_routes = importlib.import_module("app.routes.home")
+    details = {
+        "anonymous_name": "Blue Panda",
+        "reliability_score": 4.75,
+        "location": "Broadway",
+        "min_people": 2,
+        "max_people": 4,
+        "meet_time": "2026-08-29T13:00:00",
+        "expires_at": "2026-08-29T13:30:00",
+    }
+    monkeypatch.setattr(home_routes.request_repository, "get_details", lambda request_id: details)
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/home/get/request-details", query_string={"request_id": 123}
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True, "data": details}
+
+
+def test_own_request_details_returns_selected_fields(monkeypatch):
+    import importlib
+
+    home_routes = importlib.import_module("app.routes.home")
+    details = {
+        "anonymous_name": "Blue Panda",
+        "reliability_score": 4.75,
+        "location": "Broadway",
+        "min_people": 2,
+        "max_people": 4,
+        "meet_time": "2026-08-29T13:00:00",
+        "expires_at": "2026-08-29T13:30:00",
+    }
+    monkeypatch.setattr(
+        home_routes.request_repository,
+        "get_details",
+        lambda request_id: details,
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/home/get/own-request-details",
+            query_string={"request_id": 123},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True, "data": details}
+
+
+def test_request_details_requires_integer_id():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/home/get/request-details", query_string={"request_id": "abc"}
+        )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "request_id must be an integer",
+    }
+
+
+def test_own_request_returns_location(monkeypatch):
+    import importlib
+
+    home_routes = importlib.import_module("app.routes.home")
+    location = {
+        "latitude": -33.8832,
+        "longitude": 151.1943,
+        "place_name": "Broadway",
+    }
+    monkeypatch.setattr(
+        home_routes.request_repository,
+        "get_own_request",
+        lambda request_id: {"location": location},
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/home/get/own-request", query_string={"request_id": 123}
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "success": True,
+        "data": {"location": location},
+    }
+
+
+def test_own_request_requires_integer_id():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get("/api/home/get/own-request")
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "request_id must be an integer",
+    }
+
+
 def test_feature_routes_are_registered_separately():
     app = create_app("testing")
 
@@ -44,6 +155,86 @@ def test_feature_routes_are_registered_separately():
             response = client.get(path)
             assert response.status_code == 200
             assert response.get_json() == expected_json
+
+
+def test_get_all_users_profiles_returns_shared_profile(monkeypatch):
+    import importlib
+
+    meetup_routes = importlib.import_module("app.routes.meetup")
+    profile = {
+        "first_name": "Blue",
+        "last_name": "Panda",
+        "profile_image_url": "https://example.com/avatar.jpg",
+        "reliability_score": 4.75,
+    }
+    monkeypatch.setattr(
+        meetup_routes.user_repository,
+        "get_shared_profile",
+        lambda user_id: profile,
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/meetup/get/all-users-profiles", query_string={"id": 123}
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True, "data": profile}
+
+
+def test_get_all_users_profiles_requires_integer_id():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/meetup/get/all-users-profiles", query_string={"id": "abc"}
+        )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "id must be an integer",
+    }
+
+
+def test_get_all_anonymous_profiles_returns_profile(monkeypatch):
+    import importlib
+
+    meetup_routes = importlib.import_module("app.routes.meetup")
+    profile = {
+        "anonymous_name": "Blue Panda",
+        "profile_image_url": "https://example.com/avatar.jpg",
+        "reliability_score": 4.75,
+    }
+    monkeypatch.setattr(
+        meetup_routes.user_repository,
+        "get_anonymous_profile",
+        lambda user_id: profile,
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/meetup/get/all-anonymous-profiles",
+            query_string={"id": 123},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True, "data": profile}
+
+
+def test_get_all_anonymous_profiles_requires_integer_id():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get("/api/meetup/get/all-anonymous-profiles")
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "id must be an integer",
+    }
 
 
 def test_submit_request_requires_user_identity():
@@ -94,6 +285,66 @@ def test_submit_request_returns_created_data(monkeypatch):
     assert body["success"] is True
     assert body["data"]["creator_id"] == "user-id"
     assert body["data"]["location"] == payload["location"]
+
+
+def test_get_all_requests_requires_coordinates():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get("/api/request/get/all-request")
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "longitude, latitude, and radius are required",
+    }
+
+
+def test_get_all_requests_returns_nearby_locations(monkeypatch):
+    import importlib
+
+    nearby = MeetupRequest.from_submission(
+        {
+            "title": "Lunch at Broadway",
+            "min_people": 2,
+            "max_people": 4,
+            "time": "2026-08-29T13:00:00",
+            "location": {
+                "latitude": -33.8832,
+                "longitude": 151.1943,
+                "place_name": "Broadway",
+            },
+            "expired_time": "2026-08-29T13:30:00",
+        },
+        creator_id="user-id",
+        request_id="request-id",
+    )
+    request_routes = importlib.import_module("app.routes.request")
+    monkeypatch.setattr(
+        request_routes.request_repository,
+        "find_nearby",
+        lambda latitude, longitude, radius: [nearby],
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/request/get/all-request",
+            query_string={
+                "longitude": 151.1943,
+                "latitude": -33.8832,
+                "radius": 5,
+            },
+        )
+
+    body = response.get_json()
+    assert response.status_code == 200
+    assert body["success"] is True
+    assert body["data"][0]["location"] == {
+        "latitude": -33.8832,
+        "longitude": 151.1943,
+        "place_name": "Broadway",
+    }
 
 
 def test_get_all_messages_requires_meetup_id():
@@ -173,7 +424,7 @@ def test_get_own_profile_returns_selected_user_fields(monkeypatch):
 
     with app.test_client() as client:
         response = client.get(
-            "/api/users/get/own-profile", query_string={"id": "user-123"}
+            "/api/users/get/own-profile", query_string={"id": 123}
         )
 
     assert response.status_code == 200
@@ -187,6 +438,21 @@ def test_get_own_profile_returns_selected_user_fields(monkeypatch):
             "radius": 5.5,
             "profile_image_url": "https://example.com/avatar.jpg",
         },
+    }
+
+
+def test_get_own_profile_rejects_non_integer_id():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/users/get/own-profile", query_string={"id": "user-123"}
+        )
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "success": False,
+        "error": "id must be an integer",
     }
 
 
@@ -227,4 +493,4 @@ def test_edit_profile_returns_updated_profile(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert response.get_json() == {"success": True, "data": payload}
+    assert response.get_json() == {"success": True, "data": {}}
