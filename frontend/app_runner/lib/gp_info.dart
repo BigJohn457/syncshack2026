@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'rate.dart';
+import 'home_page.dart';
 
 // "hey!" brand palette & styling
 const _kPurple = Color(0xFF6C3EE8);
@@ -369,19 +370,24 @@ class GpInfoPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
 
-                      // 🔴 Red "Cancel Meetup" Button
+                      // 🔴 Red "Leave Meetup" Button -> Leaves directly to HomePage
                       GestureDetector(
                         onTap: () {
-                          Navigator.of(context)
-                              .popUntil((route) => route.isFirst);
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HomePage(),
+                            ),
+                            (route) => false,
+                          );
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: const Row(
                                 children: [
-                                  Icon(Icons.cancel_outlined,
+                                  Icon(Icons.logout_rounded,
                                       color: Colors.white, size: 19),
                                   SizedBox(width: 8),
-                                  Text('Meetup has been cancelled.'),
+                                  Text('You left the meetup. Returned to home map.'),
                                 ],
                               ),
                               backgroundColor: const Color(0xFFE53935),
@@ -405,13 +411,13 @@ class GpInfoPage extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                Icons.close_rounded,
+                                Icons.logout_rounded,
                                 color: Color(0xFFEA5B5B),
-                                size: 20,
+                                size: 19,
                               ),
-                              SizedBox(width: 6),
+                              SizedBox(width: 8),
                               Text(
-                                'Cancel Meetup',
+                                'Leave Meetup',
                                 style: TextStyle(
                                   color: Color(0xFFEA5B5B),
                                   fontSize: 14.5,
