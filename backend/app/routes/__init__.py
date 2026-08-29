@@ -1,5 +1,12 @@
-from flask import Blueprint
+"""Blueprints for each API feature area."""
 
-main = Blueprint("main", __name__)
+from .home import home
+from .meetup import meetup
+from .meetup_chat import meetup_chat
+from .rating import rating
+from .request import request
+from .users import users
 
-from . import views  # noqa: E402, F401
+blueprints = (home, request, meetup_chat, meetup, rating, users)
+
+__all__ = ["blueprints"]
