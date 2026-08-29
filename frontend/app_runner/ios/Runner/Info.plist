@@ -4,6 +4,8 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Hey uses your location to show meetup requests near you.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Hey uses selected photos for identity verification and profile images.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

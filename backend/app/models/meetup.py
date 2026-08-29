@@ -24,6 +24,7 @@ class MeetupParticipant:
     meetup_id: str
     user_id: str
     attendance_status: str
+    is_reveal: bool = False
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)

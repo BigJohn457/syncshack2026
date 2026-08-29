@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'auth/auth_api.dart';
 import 'auth/auth_session.dart';
 import 'profiles/profile_api.dart';
+import 'uploads/image_upload_api.dart';
 
 const _purple = Color(0xFF7C4DFF);
 const _cream = Color(0xFFFBF7F2);
@@ -31,8 +33,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final _phone = TextEditingController();
   final _radius = TextEditingController();
   final _imageUrl = TextEditingController();
+  final _imagePicker = ImagePicker();
+  final _imageUploadApi = ImageUploadApi();
   bool _loading = true;
   bool _saving = false;
+  bool _uploadingImage = false;
   String? _error;
 
   @override
@@ -146,16 +151,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return null;
   }
 
-  String? _urlValidator(String? value) {
-    final text = value?.trim() ?? '';
-    if (text.isEmpty) return null;
-    final uri = Uri.tryParse(text);
-    if (uri == null ||
-        !uri.hasAbsolutePath ||
-        !{'http', 'https'}.contains(uri.scheme)) {
-      return 'Enter a valid http(s) URL';
+  Future<void> _pickProfileImage() async {
+    final picture = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 88,
+      maxWidth: 1800,
+    );
+    if (picture == null || !mounted) return;
+    setState(() => _uploadingImage = true);
+    try {
+      final url = await _imageUploadApi.upload(picture);
+      if (mounted) setState(() => _imageUrl.text = url);
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingImage = false);
     }
-    return null;
   }
 
   @override
@@ -220,19 +235,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     _radiusValidator,
                     type: const TextInputType.numberWithOptions(decimal: true),
                   ),
-                  _field(
-                    'Profile image URL (optional)',
-                    Icons.image_outlined,
-                    _imageUrl,
-                    _urlValidator,
-                    type: TextInputType.url,
-                    onChanged: (_) => setState(() {}),
+                  OutlinedButton.icon(
+                    onPressed: _uploadingImage ? null : _pickProfileImage,
+                    icon: _uploadingImage
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.photo_library_outlined),
+                    label: Text(
+                      _uploadingImage
+                          ? 'Uploading image...'
+                          : 'Choose and upload profile image',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _saving ? null : _save,
+                      onPressed: _saving || _uploadingImage ? null : _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _purple,
                         foregroundColor: Colors.white,

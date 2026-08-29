@@ -41,34 +41,9 @@ class GpInfoPage extends StatelessWidget {
   const GpInfoPage({
     super.key,
     this.meetupId = '',
-    this.meetupTitle = 'GROUP INFO',
-    this.meetupSubtitle = 'Coffee Meetup • Today at 3:30 PM',
-    this.participants = const [
-      Participant(
-        name: 'Maya',
-        avatarEmoji: '👩🏽',
-        avatarBgColor: Color(0xFF6D3B29),
-        status: AttendanceStatus.attending,
-      ),
-      Participant(
-        name: 'Jasmine',
-        avatarEmoji: '👱🏼‍♀️',
-        avatarBgColor: Color(0xFFE5B869),
-        status: AttendanceStatus.attending,
-      ),
-      Participant(
-        name: 'Sophie',
-        avatarEmoji: '👩🏼',
-        avatarBgColor: Color(0xFF8B5E3C),
-        status: AttendanceStatus.pending,
-      ),
-      Participant(
-        name: 'Ethan',
-        avatarEmoji: '👦🏽',
-        avatarBgColor: Color(0xFF355C3E),
-        status: AttendanceStatus.pending,
-      ),
-    ],
+    this.meetupTitle = '',
+    this.meetupSubtitle = '',
+    this.participants = const [],
   });
 
   int get _attendingCount =>
@@ -320,7 +295,9 @@ class GpInfoPage extends StatelessWidget {
                             MaterialPageRoute(
                               builder: (context) => RatePage(
                                 meetupId: meetupId,
-                                meetupType: 'coffee meetup',
+                                meetupType: meetupSubtitle.isEmpty
+                                    ? 'meetup'
+                                    : meetupSubtitle,
                                 members: participants
                                     .where(
                                       (participant) =>

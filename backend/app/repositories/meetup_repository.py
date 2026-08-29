@@ -18,6 +18,14 @@ class MeetupUnavailableError(Exception):
     pass
 
 
+class ParticipantNotFoundError(Exception):
+    pass
+
+
+class ParticipantAccessDeniedError(Exception):
+    pass
+
+
 class MeetupRepository:
     def __init__(self, connection_factory: Callable = get_db_connection):
         self.connection_factory = connection_factory
@@ -85,6 +93,7 @@ class MeetupRepository:
                 meetup_id=acceptance.meetup_id,
                 user_id=user_id,
                 attendance_status="joined",
+                is_reveal=False,
             )
         except Exception:
             connection.rollback()
@@ -170,6 +179,96 @@ class MeetupRepository:
                     ),
                 },
             }
+        finally:
+            cursor.close()
+            connection.close()
+
+    def reveal_profile(self, meetup_id: str, user_id: str) -> dict[str, Any]:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT attendance_status
+                FROM meetup_participants
+                WHERE meetup_id = %s AND user_id = %s
+                LIMIT 1
+                FOR UPDATE
+                """,
+                (meetup_id, user_id),
+            )
+            participant = cursor.fetchone()
+            if participant is None:
+                raise ParticipantNotFoundError()
+            if participant["attendance_status"] in {"left", "cancelled"}:
+                raise ParticipantAccessDeniedError(
+                    "inactive participants cannot reveal their profile"
+                )
+
+            cursor.execute(
+                """
+                UPDATE meetup_participants
+                SET is_reveal = TRUE
+                WHERE meetup_id = %s AND user_id = %s
+                """,
+                (meetup_id, user_id),
+            )
+            connection.commit()
+            return {"meetup_id": meetup_id, "user_id": user_id, "is_reveal": True}
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            cursor.close()
+            connection.close()
+
+    def get_all_participants(
+        self, meetup_id: str, requesting_user_id: str
+    ) -> list[dict[str, Any]]:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                "SELECT 1 FROM meetups WHERE meetup_id = %s LIMIT 1",
+                (meetup_id,),
+            )
+            if cursor.fetchone() is None:
+                raise InvitationNotFoundError("meetup not found")
+
+            cursor.execute(
+                """
+                SELECT 1 FROM meetup_participants
+                WHERE meetup_id = %s AND user_id = %s
+                LIMIT 1
+                """,
+                (meetup_id, requesting_user_id),
+            )
+            if cursor.fetchone() is None:
+                raise ParticipantAccessDeniedError(
+                    "only meetup participants can view participant data"
+                )
+
+            cursor.execute(
+                """
+                SELECT meetup_id, user_id, attendance_status, joined_at, is_reveal
+                FROM meetup_participants
+                WHERE meetup_id = %s
+                ORDER BY joined_at ASC, user_id ASC
+                """,
+                (meetup_id,),
+            )
+            return [
+                {
+                    "meetup_id": row["meetup_id"],
+                    "user_id": row["user_id"],
+                    "attendance_status": row["attendance_status"],
+                    "joined_at": self._serialize_datetime(row["joined_at"]),
+                    "is_reveal": bool(row["is_reveal"]),
+                }
+                for row in cursor.fetchall()
+            ]
         finally:
             cursor.close()
             connection.close()

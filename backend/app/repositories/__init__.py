@@ -22,6 +22,8 @@ from .meetup_repository import (
     InvitationNotFoundError,
     MeetupRepository,
     MeetupUnavailableError,
+    ParticipantAccessDeniedError,
+    ParticipantNotFoundError,
 )
 from .request_repository import (
     RequestCancellationError,
@@ -50,6 +52,8 @@ __all__ = [
     "InvitationNotFoundError",
     "MeetupRepository",
     "MeetupUnavailableError",
+    "ParticipantAccessDeniedError",
+    "ParticipantNotFoundError",
     "ChatAccessDeniedError",
     "AuthRepository",
     "EmailAlreadyExistsError",

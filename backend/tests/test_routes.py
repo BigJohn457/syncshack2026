@@ -485,6 +485,7 @@ def test_accept_invitation_returns_meetup_participant(monkeypatch):
             meetup_id=acceptance.meetup_id,
             user_id=user_id,
             attendance_status="joined",
+            is_reveal=False,
         ),
     )
     app = create_app("testing")
@@ -504,6 +505,7 @@ def test_accept_invitation_returns_meetup_participant(monkeypatch):
             "meetup_id": "meetup-001",
             "user_id": "user-123",
             "attendance_status": "joined",
+            "is_reveal": False,
         },
     }
 
@@ -557,6 +559,73 @@ def test_participant_status_returns_both_tables(monkeypatch):
 
     assert response.status_code == 200
     assert response.get_json() == {"success": True, "data": expected}
+
+
+def test_reveal_profile_changes_flag_to_true(monkeypatch):
+    import importlib
+
+    meetup_routes = importlib.import_module("app.routes.meetup")
+    monkeypatch.setattr(
+        meetup_routes.meetup_repository,
+        "reveal_profile",
+        lambda meetup_id, user_id: {
+            "meetup_id": meetup_id,
+            "user_id": user_id,
+            "is_reveal": True,
+        },
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/meetup/post/reveal-profile",
+            json={"meetup_id": "meetup-001"},
+            headers={"X-User-ID": "user-123"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json()["data"]["is_reveal"] is True
+
+
+def test_get_all_participants_returns_every_table_field(monkeypatch):
+    import importlib
+
+    meetup_routes = importlib.import_module("app.routes.meetup")
+    participants = [
+        {
+            "meetup_id": "meetup-001",
+            "user_id": "user-123",
+            "attendance_status": "joined",
+            "joined_at": "2026-08-30T09:00:00",
+            "is_reveal": False,
+        },
+        {
+            "meetup_id": "meetup-001",
+            "user_id": "user-456",
+            "attendance_status": "attended",
+            "joined_at": "2026-08-30T09:01:00",
+            "is_reveal": True,
+        },
+    ]
+    monkeypatch.setattr(
+        meetup_routes.meetup_repository,
+        "get_all_participants",
+        lambda meetup_id, user_id: participants,
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/meetup/get/all-participants",
+            query_string={"meetup_id": "meetup-001"},
+            headers={"X-User-ID": "user-123"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "success": True,
+        "data": {"meetup_id": "meetup-001", "participants": participants},
+    }
 
 
 def test_upload_picture_requires_multipart_file():

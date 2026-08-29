@@ -18,6 +18,7 @@ class NearbyRequest {
     required this.maxPeople,
     required this.meetTime,
     required this.expiresAt,
+    required this.meetupId,
   });
 
   final String id;
@@ -29,6 +30,7 @@ class NearbyRequest {
   final int maxPeople;
   final DateTime? meetTime;
   final DateTime? expiresAt;
+  final String? meetupId;
 
   factory NearbyRequest.fromJson(Map<String, dynamic> json) {
     final location = json['location'];
@@ -51,6 +53,7 @@ class NearbyRequest {
       maxPeople: (json['max_people'] as num?)?.toInt() ?? 1,
       meetTime: DateTime.tryParse(json['time']?.toString() ?? ''),
       expiresAt: DateTime.tryParse(json['expired_time']?.toString() ?? ''),
+      meetupId: json['meetup_id']?.toString(),
     );
   }
 }

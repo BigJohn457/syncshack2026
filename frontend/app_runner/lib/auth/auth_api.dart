@@ -29,6 +29,10 @@ class AuthApi {
     });
   }
 
+  Future<void> logout() async {
+    await _post('/api/auth/post/logout', const {});
+  }
+
   Future<Map<String, dynamic>> signUp({
     required String firstName,
     required String lastName,

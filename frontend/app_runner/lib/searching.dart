@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
@@ -5,6 +7,7 @@ import 'auth/auth_api.dart';
 import 'chat.dart';
 import 'main.dart' show HomePage;
 import 'map_style.dart';
+import 'meetups/meetup_api.dart';
 import 'requests/active_request_store.dart';
 import 'requests/meetup_requests_api.dart';
 
@@ -21,10 +24,10 @@ class SearchingPage extends StatefulWidget {
 
   const SearchingPage({
     super.key,
-    this.activity = 'Grab coffee ☕',
-    this.people = '2',
-    this.place = 'Sydney CBD',
-    this.time = '8:30 AM',
+    this.activity = '',
+    this.people = '',
+    this.place = '',
+    this.time = '',
     this.latitude = -33.8688,
     this.longitude = 151.2093,
     this.acceptedCount = 0,
@@ -51,11 +54,16 @@ class _SearchingPageState extends State<SearchingPage>
     with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
   final MeetupRequestsApi _requestsApi = MeetupRequestsApi();
+  final MeetupApi _meetupApi = MeetupApi();
   late final LatLng _initialCenter = LatLng(widget.latitude, widget.longitude);
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   bool _cancelling = false;
+  Timer? _statusTimer;
+  late int _acceptedCount = widget.acceptedCount;
+  late final String _meetupId = widget.meetupId;
+  bool _openingChat = false;
 
   @override
   void initState() {
@@ -70,28 +78,55 @@ class _SearchingPageState extends State<SearchingPage>
       end: 1.0,
     ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
 
-    final maximumPeople = int.tryParse(widget.people.split('-').last) ?? 1;
-    if (widget.acceptedCount >= maximumPeople && widget.meetupId.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute<void>(
-            builder: (_) => ChatPage(
-              activity: widget.activity,
-              place: widget.place,
-              meetupId: widget.meetupId,
-            ),
-          ),
-        );
-      });
+    if (_meetupId.isNotEmpty) {
+      _pollParticipantStatus();
+      _statusTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => _pollParticipantStatus(),
+      );
     }
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
+    _statusTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _pollParticipantStatus() async {
+    if (_meetupId.isEmpty || _openingChat) return;
+    try {
+      final results = await Future.wait<Object>([
+        _meetupApi.participantStatus(_meetupId),
+        _meetupApi.participants(_meetupId),
+      ]);
+      final status = results[0] as ParticipantStatus;
+      final participants = results[1] as List<MeetupParticipant>;
+      if (!mounted) return;
+      final acceptedCount = participants.where((item) => item.isActive).length;
+      if (acceptedCount != _acceptedCount) {
+        setState(() => _acceptedCount = acceptedCount);
+      }
+      if (status.hasJoined) {
+        final maximumPeople = int.tryParse(widget.people.split('-').last) ?? 1;
+        if (_acceptedCount >= maximumPeople) {
+          _openingChat = true;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute<void>(
+              builder: (_) => ChatPage(
+                activity: widget.activity,
+                place: widget.place,
+                meetupId: _meetupId,
+              ),
+            ),
+          );
+        }
+      }
+    } on AuthException {
+      // Polling retries automatically; explicit actions show errors.
+    }
   }
 
   @override
@@ -329,8 +364,8 @@ class _SearchingPageState extends State<SearchingPage>
   Widget _buildSectionHeader() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        Row(
+      children: [
+        const Row(
           children: [
             Icon(Icons.radar_rounded, color: Color(0xFF6C3EE8), size: 22),
             SizedBox(width: 8),
@@ -345,10 +380,10 @@ class _SearchingPageState extends State<SearchingPage>
             ),
           ],
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
-          'Broadcasting your request to people nearby in Sydney ✨',
-          style: TextStyle(
+          'Broadcasting your request to people near ${widget.place}',
+          style: const TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w400,
             color: Color(0xFF5C5B72),
@@ -399,7 +434,7 @@ class _SearchingPageState extends State<SearchingPage>
                 Text(
                   widget.activity.isNotEmpty
                       ? widget.activity
-                      : 'Grab Coffee ☕',
+                      : 'Meetup request',
                   style: const TextStyle(
                     fontSize: 16.5,
                     fontWeight: FontWeight.w800,
@@ -420,7 +455,7 @@ class _SearchingPageState extends State<SearchingPage>
                 const SizedBox(height: 8),
 
                 Text(
-                  '${widget.acceptedCount} accepted',
+                  '$_acceptedCount accepted',
                   style: const TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
@@ -487,14 +522,14 @@ class _SearchingPageState extends State<SearchingPage>
           ),
         ],
       ),
-      child: const Row(
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.explore_rounded, color: Color(0xFF6C3EE8), size: 17),
-          SizedBox(width: 6),
+          const Icon(Icons.explore_rounded, color: Color(0xFF6C3EE8), size: 17),
+          const SizedBox(width: 6),
           Text(
-            'Searching nearby in Sydney...',
-            style: TextStyle(
+            'Searching near ${widget.place}...',
+            style: const TextStyle(
               color: Color(0xFF6C3EE8),
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
@@ -538,7 +573,7 @@ class _SearchingPageState extends State<SearchingPage>
 
   // -------------------------------------------------------------
   void _openChat() {
-    if (widget.acceptedCount == 0 || widget.meetupId.isEmpty) {
+    if (_acceptedCount == 0 || _meetupId.isEmpty) {
       showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
@@ -562,7 +597,7 @@ class _SearchingPageState extends State<SearchingPage>
         builder: (_) => ChatPage(
           activity: widget.activity,
           place: widget.place,
-          meetupId: widget.meetupId,
+          meetupId: _meetupId,
         ),
       ),
     );
@@ -678,7 +713,7 @@ class _SearchingPageState extends State<SearchingPage>
               child: Container(
                 height: 52,
                 decoration: BoxDecoration(
-                  color: widget.acceptedCount > 0 && widget.meetupId.isNotEmpty
+                  color: _acceptedCount > 0 && _meetupId.isNotEmpty
                       ? const Color(0xFF6C3EE8)
                       : const Color(0xFFD5D3DB),
                   borderRadius: BorderRadius.circular(28),
@@ -693,7 +728,7 @@ class _SearchingPageState extends State<SearchingPage>
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      widget.acceptedCount == 0 ? 'Chat (waiting)' : 'Chat',
+                      _acceptedCount == 0 ? 'Chat (waiting)' : 'Chat',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,

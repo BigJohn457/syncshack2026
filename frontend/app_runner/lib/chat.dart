@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'auth/auth_api.dart';
 import 'auth/auth_session.dart';
 import 'chat/meetup_chat_api.dart';
 import 'gp_info.dart';
+import 'uploads/image_upload_api.dart';
 
 class ChatPage extends StatefulWidget {
   final String matchName;
@@ -15,10 +18,10 @@ class ChatPage extends StatefulWidget {
 
   const ChatPage({
     super.key,
-    this.matchName = 'Anonymous Meetup',
+    this.matchName = '',
     this.matchAvatar = '',
-    this.activity = 'Coffee Meetup',
-    this.place = 'Single O / Surry Hills',
+    this.activity = '',
+    this.place = '',
     this.meetupId = '',
   });
 
@@ -31,6 +34,7 @@ class _ChatPageState extends State<ChatPage> {
   final ScrollController _scrollController = ScrollController();
 
   final MeetupChatApi _chatApi = MeetupChatApi();
+  final ImageUploadApi _imageUploadApi = ImageUploadApi();
   List<ChatMessage> _messages = const [];
   Timer? _refreshTimer;
   bool _loading = true;
@@ -159,6 +163,42 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  Future<void> _shareLocation() async {
+    Navigator.pop(context);
+    try {
+      final position = await Geolocator.getCurrentPosition();
+      _textController.text =
+          'https://www.openstreetmap.org/?mlat=${position.latitude}&mlon=${position.longitude}';
+      await _sendMessage();
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not access your location.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _sharePhoto() async {
+    Navigator.pop(context);
+    final picture = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 88,
+      maxWidth: 1800,
+    );
+    if (picture == null) return;
+    try {
+      _textController.text = await _imageUploadApi.upload(picture);
+      await _sendMessage();
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
+  }
+
   void _showPlusActionsSheet() {
     showModalBottomSheet(
       context: context,
@@ -211,12 +251,7 @@ class _ChatPageState extends State<ChatPage> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: const Text('Let others know where you are standing'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _textController.text =
-                      "📍 Sharing my live location: Outside main lobby";
-                  _sendMessage();
-                },
+                onTap: _shareLocation,
               ),
               ListTile(
                 leading: Container(
@@ -233,11 +268,7 @@ class _ChatPageState extends State<ChatPage> {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 subtitle: const Text('Snap a picture of the meeting spot'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _textController.text = "📸 [Sent Photo: Outside cafe]";
-                  _sendMessage();
-                },
+                onTap: _sharePhoto,
               ),
             ],
           ),

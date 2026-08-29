@@ -29,7 +29,7 @@ class RatePage extends StatefulWidget {
 
   const RatePage({
     super.key,
-    this.meetupType = 'coffee meetup',
+    this.meetupType = 'meetup',
     this.meetupId = '',
     this.members = const [],
   });

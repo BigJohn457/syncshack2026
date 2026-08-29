@@ -7,6 +7,8 @@ from app.repositories import (
     InvitationNotFoundError,
     MeetupRepository,
     MeetupUnavailableError,
+    ParticipantAccessDeniedError,
+    ParticipantNotFoundError,
     UserRepository,
 )
 from app.logging_config import log_handled_exception
@@ -120,3 +122,64 @@ def get_participant_status():
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(success=True, data=status), 200
+
+
+@meetup_api.post("/post/reveal-profile")
+def reveal_profile():
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="X-User-ID header is required"), 400
+
+    try:
+        meetup_id = read_varchar_id(request, "meetup_id")
+        revealed = meetup_repository.reveal_profile(meetup_id, user_id)
+    except ValueError as exc:
+        log_handled_exception("Reveal profile validation failed", exc)
+        return jsonify(success=False, error=str(exc)), 400
+    except ParticipantNotFoundError as exc:
+        log_handled_exception("Reveal profile participant not found", exc)
+        return jsonify(success=False, error="participant not found"), 404
+    except ParticipantAccessDeniedError as exc:
+        log_handled_exception("Reveal profile access denied", exc)
+        return jsonify(success=False, error=str(exc)), 403
+    except MySQLError as exc:
+        log_handled_exception("Reveal profile database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+
+    return jsonify(
+        success=True,
+        message="Profile reveal enabled",
+        data=revealed,
+    ), 200
+
+
+@meetup_api.get("/get/all-participants")
+def get_all_participants():
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="X-User-ID header is required"), 400
+
+    try:
+        meetup_id = read_varchar_id(request, "meetup_id")
+        participants = meetup_repository.get_all_participants(meetup_id, user_id)
+    except ValueError as exc:
+        log_handled_exception("Participant list validation failed", exc)
+        return jsonify(success=False, error=str(exc)), 400
+    except InvitationNotFoundError as exc:
+        log_handled_exception("Participant list meetup not found", exc)
+        return jsonify(success=False, error="meetup not found"), 404
+    except ParticipantAccessDeniedError as exc:
+        log_handled_exception("Participant list access denied", exc)
+        return jsonify(success=False, error=str(exc)), 403
+    except MySQLError as exc:
+        log_handled_exception("Participant list database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+
+    return jsonify(
+        success=True,
+        data={"meetup_id": meetup_id, "participants": participants},
+    ), 200

@@ -8,10 +8,13 @@ import 'package:latlong2/latlong.dart' hide Path;
 
 import 'auth/auth_page.dart';
 import 'auth/auth_api.dart';
+import 'auth/auth_session.dart';
 import 'chat.dart';
 import 'datetime.dart';
 import 'edit_profile.dart';
 import 'map_style.dart';
+import 'meetups/meetup_api.dart';
+import 'profiles/profile_api.dart';
 import 'requests/nearby_requests_api.dart';
 import 'requests/active_request_store.dart';
 import 'searching.dart';
@@ -52,12 +55,14 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedCardIndex = 0;
   String? _selectedPinId;
-  String _userName = 'John Ng';
-  String _userStatus = 'Open for coffee ☕';
+  String _userName = '';
+  String _userStatus = '';
 
   // Map Controller for interactive moving/zooming
   final MapController _mapController = MapController();
   final NearbyRequestsApi _nearbyRequestsApi = NearbyRequestsApi();
+  final MeetupApi _meetupApi = MeetupApi();
+  String? _joiningRequestId;
   static const LatLng _fallbackCenter = LatLng(-33.8688, 151.2093);
   static const double _defaultRadiusKm = 2;
   static const double _defaultZoom = 14.5;
@@ -70,38 +75,42 @@ class _HomePageState extends State<HomePage> {
   Timer? _zoomDebounce;
   int _requestGeneration = 0;
 
-  // Match Cards Data
-  final List<Map<String, dynamic>> _matchCards = [
-    {
-      'title': 'Grab coffee ☕',
-      'subtitle': 'Looking for a coffee buddy nearby!',
-      'time': '15 mins ago',
-      'distance': '0.4 km away',
-      'emoji': '☕',
-      'person': 'Alex Rivera',
-      'place': 'Single O / Surry Hills',
-      'bio':
-          'Taking a study break near Central, would love a flat white and quick chat!',
-    },
-    {
-      'title': 'Afternoon Walk 🚶',
-      'subtitle': 'Going for a brisk walk along the harbor!',
-      'time': '8 mins ago',
-      'distance': '0.3 km away',
-      'emoji': '🚶',
-      'person': 'Jordan Lee',
-      'place': 'Barangaroo Foreshore',
-      'bio':
-          'Enjoying the Sydney sunshine. Down for a 20-minute walk by the water.',
-    },
-  ];
-
   List<MapPinData> _pins = const [];
+  List<Map<String, dynamic>> get _matchCards => _pins
+      .map(
+        (pin) => <String, dynamic>{
+          'title': pin.title,
+          'subtitle': pin.description,
+          'time': pin.time,
+          'distance': pin.distance,
+          'emoji': '📍',
+          'person': pin.author,
+          'place': pin.category,
+          'bio': pin.description,
+        },
+      )
+      .toList();
 
   @override
   void initState() {
     super.initState();
     _loadPhoneLocation();
+    _loadProfileSummary();
+  }
+
+  Future<void> _loadProfileSummary() async {
+    final userId = AuthSession.currentUserId;
+    if (userId == null) return;
+    try {
+      final profile = await ProfileApi().fetch(userId);
+      if (mounted) {
+        setState(
+          () => _userName = '${profile.firstName} ${profile.lastName}'.trim(),
+        );
+      }
+    } on AuthException {
+      // The edit profile screen exposes retry/error details.
+    }
   }
 
   @override
@@ -193,6 +202,7 @@ class _HomePageState extends State<HomePage> {
             distance: '${(metres / 1000).toStringAsFixed(1)} km away',
             description:
                 '${request.placeName} • ${request.minPeople}-${request.maxPeople} people',
+            meetupId: request.meetupId,
           );
         }).toList();
       });
@@ -276,16 +286,16 @@ class _HomePageState extends State<HomePage> {
                   _buildTopBar(),
                   const SizedBox(height: 18),
 
-                  // Section Title: "Your top match"
-                  _buildSectionHeader(),
-                  const SizedBox(height: 14),
-
-                  // White Top Match Card
-                  _buildTopMatchCard(),
-                  const SizedBox(height: 14),
-
-                  // Pagination Dots
-                  _buildPaginationDots(),
+                  Text(
+                    _loadingRequests
+                        ? 'Loading nearby requests...'
+                        : '${_pins.length} nearby request${_pins.length == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E1B2E),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1146,6 +1156,42 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<void> _acceptInvitation(MapPinData pin) async {
+    final meetupId = pin.meetupId?.trim() ?? '';
+    if (meetupId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This request does not have an invitation yet.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _joiningRequestId = pin.id);
+    try {
+      await _meetupApi.acceptInvitation(meetupId);
+      if (!mounted) return;
+      Navigator.pop(context);
+      Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (_) => ChatPage(
+            activity: pin.title.replaceAll('\n', ' '),
+            place: pin.category,
+            meetupId: meetupId,
+          ),
+        ),
+      );
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _joiningRequestId = null);
+    }
+  }
+
   void _showPinDetailSheet(MapPinData pin) {
     showModalBottomSheet(
       context: context,
@@ -1225,19 +1271,9 @@ class _HomePageState extends State<HomePage> {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ChatPage(
-                          matchName: pin.author,
-                          activity: pin.title.replaceAll('\n', ' '),
-                          place: pin.category,
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: _joiningRequestId == pin.id
+                      ? null
+                      : () => _acceptInvitation(pin),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6C3EE8),
                     foregroundColor: Colors.white,
@@ -1405,10 +1441,6 @@ class _HomePageState extends State<HomePage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              Text(
-                'Active Status: $_userStatus',
-                style: const TextStyle(color: Color(0xFF6C3EE8), fontSize: 13),
-              ),
               const SizedBox(height: 20),
               ListTile(
                 leading: const Icon(Icons.edit, color: Color(0xFF6C3EE8)),
@@ -1490,25 +1522,12 @@ class _HomePageState extends State<HomePage> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 14),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFEFF1FE),
-                  child: Icon(Icons.local_cafe, color: Color(0xFF6C3EE8)),
+              const ListTile(
+                leading: Icon(Icons.notifications_none_rounded),
+                title: Text('No notifications yet'),
+                subtitle: Text(
+                  'Notifications will appear when the backend provides them.',
                 ),
-                title: const Text('Elena accepted your coffee request!'),
-                subtitle: const Text('10 mins ago'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ChatPage(
-                        matchName: 'Elena R.',
-                        activity: 'Coffee Meetup',
-                      ),
-                    ),
-                  );
-                },
               ),
             ],
           ),
@@ -1530,6 +1549,7 @@ class MapPinData {
   final String author;
   final String distance;
   final String description;
+  final String? meetupId;
 
   const MapPinData({
     required this.id,
@@ -1540,6 +1560,7 @@ class MapPinData {
     this.author = 'Friend',
     this.distance = '0.5 km away',
     this.description = 'Looking for someone to meetup right now!',
+    this.meetupId,
   });
 }
 

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'auth/auth_api.dart';
+import 'auth/auth_session.dart';
+import 'requests/active_request_store.dart';
 
 // "hey!" brand palette
 const _kPurple = Color(0xFF7C4DFF);
@@ -20,6 +23,26 @@ class _SettingsPageState extends State<SettingsPage> {
   bool _pushNotifications = true;
   bool _locationSharing = true;
   bool _profileVisible = true;
+  bool _loggingOut = false;
+
+  Future<void> _logout() async {
+    if (_loggingOut) return;
+    setState(() => _loggingOut = true);
+    try {
+      await AuthApi().logout();
+      AuthSession.currentUserId = null;
+      await ActiveRequestStore.clear();
+      if (mounted) widget.onLogOut();
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _loggingOut = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,11 +104,11 @@ class _SettingsPageState extends State<SettingsPage> {
               width: double.infinity,
               height: 56,
               child: OutlinedButton.icon(
-                onPressed: widget.onLogOut,
+                onPressed: _loggingOut ? null : _logout,
                 icon: const Icon(Icons.logout_rounded, color: _kMutedRed),
-                label: const Text(
-                  'Log Out',
-                  style: TextStyle(
+                label: Text(
+                  _loggingOut ? 'Logging out...' : 'Log Out',
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: _kMutedRed,

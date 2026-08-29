@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../main.dart' show HomePage;
 import '../requests/active_request_store.dart';
 import '../searching.dart';
 import '../chat.dart';
+import '../uploads/image_upload_api.dart';
 import 'auth_api.dart';
 import 'auth_session.dart';
 
@@ -29,11 +31,14 @@ class _AuthPageState extends State<AuthPage> {
   final _phone = TextEditingController();
   final _idPhoto = TextEditingController();
   final _facePhoto = TextEditingController();
+  final _imagePicker = ImagePicker();
+  final _imageUploadApi = ImageUploadApi();
 
   bool _isSignUp = false;
   bool _loading = false;
   bool _obscurePassword = true;
   String? _error;
+  String? _uploadingPhoto;
 
   @override
   void dispose() {
@@ -72,21 +77,38 @@ class _AuthPageState extends State<AuthPage> {
     return null;
   }
 
-  String? _urlValidator(String? value) {
-    final requiredError = _required(value);
-    if (requiredError != null) return requiredError;
-    final uri = Uri.tryParse(value!.trim());
-    if (uri == null ||
-        !uri.hasAbsolutePath ||
-        (uri.scheme != 'http' && uri.scheme != 'https')) {
-      return 'Enter a valid http(s) URL';
+  Future<void> _pickAndUploadPhoto({required bool isIdPhoto}) async {
+    final label = isIdPhoto ? 'ID photo' : 'Face photo';
+    final picture = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 88,
+      maxWidth: 1800,
+    );
+    if (picture == null || !mounted) return;
+    setState(() {
+      _uploadingPhoto = label;
+      _error = null;
+    });
+    try {
+      final url = await _imageUploadApi.upload(picture);
+      if (!mounted) return;
+      setState(() {
+        (isIdPhoto ? _idPhoto : _facePhoto).text = url;
+      });
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = null);
     }
-    return null;
   }
 
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
+    if (_isSignUp && (_idPhoto.text.isEmpty || _facePhoto.text.isEmpty)) {
+      setState(() => _error = 'Upload both your ID and face photos.');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -272,20 +294,18 @@ class _AuthPageState extends State<AuthPage> {
                         validator: _required,
                       ),
                       const SizedBox(height: 12),
-                      _field(
-                        _idPhoto,
-                        'ID photo URL',
-                        Icons.badge_outlined,
-                        keyboardType: TextInputType.url,
-                        validator: _urlValidator,
+                      _photoButton(
+                        label: 'ID photo',
+                        icon: Icons.badge_outlined,
+                        uploaded: _idPhoto.text.isNotEmpty,
+                        onPressed: () => _pickAndUploadPhoto(isIdPhoto: true),
                       ),
                       const SizedBox(height: 12),
-                      _field(
-                        _facePhoto,
-                        'Face photo URL',
-                        Icons.face_outlined,
-                        keyboardType: TextInputType.url,
-                        validator: _urlValidator,
+                      _photoButton(
+                        label: 'Face photo',
+                        icon: Icons.face_outlined,
+                        uploaded: _facePhoto.text.isNotEmpty,
+                        onPressed: () => _pickAndUploadPhoto(isIdPhoto: false),
                       ),
                     ],
                     if (_error != null) ...[
@@ -302,7 +322,9 @@ class _AuthPageState extends State<AuthPage> {
                     SizedBox(
                       height: 56,
                       child: FilledButton(
-                        onPressed: _loading ? null : _submit,
+                        onPressed: _loading || _uploadingPhoto != null
+                            ? null
+                            : _submit,
                         style: FilledButton.styleFrom(backgroundColor: _purple),
                         child: _loading
                             ? const SizedBox.square(
@@ -365,6 +387,35 @@ class _AuthPageState extends State<AuthPage> {
           borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
+      ),
+    );
+  }
+
+  Widget _photoButton({
+    required String label,
+    required IconData icon,
+    required bool uploaded,
+    required VoidCallback onPressed,
+  }) {
+    final uploading = _uploadingPhoto == label;
+    return OutlinedButton.icon(
+      onPressed: _uploadingPhoto == null ? onPressed : null,
+      icon: uploading
+          ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(uploaded ? Icons.check_circle : icon),
+      label: Text(
+        uploading
+            ? 'Uploading $label...'
+            : uploaded
+            ? '$label uploaded — tap to replace'
+            : 'Choose and upload $label',
+      ),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        alignment: Alignment.centerLeft,
       ),
     );
   }

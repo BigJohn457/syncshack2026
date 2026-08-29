@@ -543,6 +543,82 @@ not found, `500` database error.
 
 ## Users and meetup profiles
 
+### Reveal own profile to meetup participants
+
+```http
+POST /api/meetup/post/reveal-profile
+```
+
+Authentication: session cookie required; `X-User-ID` is a temporary fallback.
+New `meetup_participants` rows default to `is_reveal: false`. This endpoint
+changes the logged-in participant's value to `true`.
+
+Request body:
+
+```json
+{
+  "meetup_id": "meetup-001"
+}
+```
+
+Success — `200`:
+
+```json
+{
+  "success": true,
+  "message": "Profile reveal enabled",
+  "data": {
+    "meetup_id": "meetup-001",
+    "user_id": "user-123",
+    "is_reveal": true
+  }
+}
+```
+
+Participants with `left` or `cancelled` attendance cannot reveal their profile.
+Errors: `400` invalid input/missing identity, `403` inactive participant, `404`
+participant not found, `500` database error.
+
+### Get all meetup participant rows
+
+```http
+GET /api/meetup/get/all-participants?meetup_id=meetup-001
+```
+
+Authentication: session cookie required; `X-User-ID` is a temporary fallback.
+Only a user who exists in this meetup's `meetup_participants` table can read the
+list. The response includes every column from `meetup_participants`.
+
+Success — `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "meetup_id": "meetup-001",
+    "participants": [
+      {
+        "meetup_id": "meetup-001",
+        "user_id": "user-123",
+        "attendance_status": "joined",
+        "joined_at": "2026-08-30T09:00:00",
+        "is_reveal": false
+      },
+      {
+        "meetup_id": "meetup-001",
+        "user_id": "user-456",
+        "attendance_status": "attended",
+        "joined_at": "2026-08-30T09:01:00",
+        "is_reveal": true
+      }
+    ]
+  }
+}
+```
+
+Errors: `400` invalid meetup ID/missing identity, `403` caller is not a meetup
+participant, `404` meetup not found, `500` database error.
+
 ### Check meetup and request participation
 
 ```http
@@ -624,7 +700,8 @@ Success — `200`:
   "data": {
     "meetup_id": "meetup-001",
     "user_id": "user-123",
-    "attendance_status": "joined"
+    "attendance_status": "joined",
+    "is_reveal": false
   }
 }
 ```
