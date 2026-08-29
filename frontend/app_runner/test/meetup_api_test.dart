@@ -99,6 +99,21 @@ void main() {
     expect(jsonDecode(captured.body), {'meetup_id': 'meetup-1'});
   });
 
+  test('marks meetup participation as finished', () async {
+    late http.Request captured;
+    final api = MeetupApi(
+      client: MockClient((request) async {
+        captured = request;
+        return http.Response(jsonEncode({'success': true, 'data': {}}), 200);
+      }),
+    );
+
+    await api.finishParticipation('meetup-1');
+
+    expect(captured.url.path, '/api/meetup/post/finish-participation');
+    expect(jsonDecode(captured.body), {'meetup_id': 'meetup-1'});
+  });
+
   test('loads an anonymous participant profile for rating', () async {
     late http.Request captured;
     final api = MeetupApi(

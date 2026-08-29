@@ -229,6 +229,52 @@ class MeetupRepository:
             cursor.close()
             connection.close()
 
+    def finish_participation(self, meetup_id: str, user_id: str) -> dict[str, Any]:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                "SELECT status FROM meetups WHERE meetup_id = %s LIMIT 1",
+                (meetup_id,),
+            )
+            meetup = cursor.fetchone()
+            if meetup is None:
+                raise InvitationNotFoundError("meetup not found")
+            if meetup["status"] != "completed":
+                raise MeetupUnavailableError("meetup is not completed")
+
+            cursor.execute(
+                """
+                SELECT attendance_status FROM meetup_participants
+                WHERE meetup_id = %s AND user_id = %s
+                LIMIT 1 FOR UPDATE
+                """,
+                (meetup_id, user_id),
+            )
+            participant = cursor.fetchone()
+            if participant is None:
+                raise ParticipantNotFoundError()
+
+            cursor.execute(
+                """
+                UPDATE meetup_participants SET attendance_status = 'finished'
+                WHERE meetup_id = %s AND user_id = %s
+                """,
+                (meetup_id, user_id),
+            )
+            connection.commit()
+            return {
+                "meetup_id": meetup_id,
+                "user_id": user_id,
+                "attendance_status": "finished",
+            }
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            cursor.close()
+            connection.close()
+
     def get_all_participants(
         self, meetup_id: str, requesting_user_id: str
     ) -> list[dict[str, Any]]:

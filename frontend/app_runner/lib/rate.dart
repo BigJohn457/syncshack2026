@@ -167,11 +167,22 @@ class _RatePageState extends State<RatePage> {
       }
     }
     if (!mounted) return;
-    setState(() => _submitting = false);
     if (failures.isNotEmpty) {
+      setState(() => _submitting = false);
       _showError(failures.join('\n'));
       return;
     }
+
+    try {
+      await _meetupApi.finishParticipation(widget.meetupId.trim());
+    } on AuthException catch (error) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        _showError(error.message);
+      }
+      return;
+    }
+    if (!mounted) return;
 
     Navigator.of(context).popUntil((route) => route.isFirst);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -193,8 +204,22 @@ class _RatePageState extends State<RatePage> {
     );
   }
 
-  void _skipRatings() {
+  Future<void> _skipRatings() async {
     if (_submitting) return;
+    if (widget.meetupId.trim().isEmpty) {
+      _showError('This rating screen is missing its meetup ID.');
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      await _meetupApi.finishParticipation(widget.meetupId.trim());
+    } on AuthException catch (error) {
+      if (mounted) _showError(error.message);
+      return;
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+    if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 

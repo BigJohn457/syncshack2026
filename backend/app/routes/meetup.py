@@ -124,6 +124,30 @@ def get_participant_status():
     return jsonify(success=True, data=status), 200
 
 
+@meetup_api.post("/post/finish-participation")
+def finish_participation():
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="X-User-ID header is required"), 400
+    try:
+        meetup_id = read_varchar_id(request, "meetup_id")
+        result = meetup_repository.finish_participation(meetup_id, user_id)
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
+    except InvitationNotFoundError:
+        return jsonify(success=False, error="meetup not found"), 404
+    except ParticipantNotFoundError:
+        return jsonify(success=False, error="participant not found"), 404
+    except MeetupUnavailableError as exc:
+        return jsonify(success=False, error=str(exc)), 409
+    except MySQLError as exc:
+        log_handled_exception("Finish participation database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+    return jsonify(success=True, data=result), 200
+
+
 @meetup_api.post("/post/reveal-profile")
 def reveal_profile():
     user_id = str(

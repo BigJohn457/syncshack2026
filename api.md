@@ -764,7 +764,8 @@ returns `200`; that object's `exists` value is `false` and its status/timestamp
 fields are `null`.
 
 Possible `meetup_participant.attendance_status` values are `joined`, `attended`,
-`no_show`, `left`, and `cancelled`. Possible `request_participant.status` values
+`finished`, `no_show`, `left`, and `cancelled`. `finished` means that the user
+has submitted or skipped the optional rating stage. Possible `request_participant.status` values
 are `pending`, `accepted`, `rejected`, and `cancelled`.
 
 Errors: `400` missing/invalid meetup ID or missing identity, `404` meetup not

@@ -430,7 +430,7 @@ class RequestRepository:
                   AND r.status NOT IN ('cancelled', 'expired')
                   AND COALESCE(m.status, '') != 'cancelled'
                   AND COALESCE(mp.attendance_status, 'joined')
-                      NOT IN ('left', 'cancelled')
+                      NOT IN ('finished', 'left', 'cancelled')
                 ORDER BY CASE COALESCE(m.status, '')
                     WHEN 'completed' THEN 1 WHEN 'active' THEN 2
                     WHEN 'matched' THEN 3 ELSE 4 END, r.meet_time DESC

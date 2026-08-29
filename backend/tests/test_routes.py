@@ -643,6 +643,33 @@ def test_participant_status_requires_user_identity():
     assert response.get_json()["error"] == "X-User-ID header is required"
 
 
+def test_finish_participation_updates_the_logged_in_participant(monkeypatch):
+    import importlib
+
+    meetup_routes = importlib.import_module("app.routes.meetup")
+    expected = {
+        "meetup_id": "meetup-001",
+        "user_id": "user-123",
+        "attendance_status": "finished",
+    }
+    monkeypatch.setattr(
+        meetup_routes.meetup_repository,
+        "finish_participation",
+        lambda meetup_id, user_id: expected,
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/meetup/post/finish-participation",
+            json={"meetup_id": "meetup-001"},
+            headers={"X-User-ID": "user-123"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True, "data": expected}
+
+
 def test_participant_status_returns_both_tables(monkeypatch):
     import importlib
 

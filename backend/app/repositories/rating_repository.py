@@ -45,7 +45,7 @@ class RatingRepository:
             attendees = {
                 row["user_id"]
                 for row in cursor.fetchall()
-                if row["attendance_status"] == "attended"
+                if row["attendance_status"] in {"attended", "finished"}
             }
             if attendees != {from_user_id, submission.to_user_id}:
                 raise RatingEligibilityError(

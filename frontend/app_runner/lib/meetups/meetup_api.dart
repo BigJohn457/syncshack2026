@@ -49,7 +49,8 @@ class MeetupParticipant {
   final String attendanceStatus;
   final bool isReveal;
 
-  bool get isActive => const {'joined', 'attended'}.contains(attendanceStatus);
+  bool get isActive =>
+      const {'joined', 'attended', 'finished'}.contains(attendanceStatus);
 
   factory MeetupParticipant.fromJson(Map<String, dynamic> json) {
     return MeetupParticipant(
@@ -118,6 +119,16 @@ class MeetupApi {
     await _request(
       () => _client.post(
         ApiConfig.uri('/api/meetup/post/reveal-profile'),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({'meetup_id': meetupId}),
+      ),
+    );
+  }
+
+  Future<void> finishParticipation(String meetupId) async {
+    await _request(
+      () => _client.post(
+        ApiConfig.uri('/api/meetup/post/finish-participation'),
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode({'meetup_id': meetupId}),
       ),
