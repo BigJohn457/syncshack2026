@@ -8,8 +8,11 @@ import 'package:latlong2/latlong.dart' hide Path;
 
 import 'auth/auth_page.dart';
 import 'auth/auth_api.dart';
+import 'chat.dart';
 import 'datetime.dart';
+import 'edit_profile.dart';
 import 'requests/nearby_requests_api.dart';
+import 'settings.dart';
 
 void main() {
   runApp(const MyApp());
@@ -46,6 +49,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedCardIndex = 0;
   String? _selectedPinId;
+  String _userName = 'John Ng';
+  String _userStatus = 'Open for coffee ☕';
 
   // Map Controller for interactive moving/zooming
   final MapController _mapController = MapController();
@@ -1064,13 +1069,14 @@ class _HomePageState extends State<HomePage> {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Connected with ${match['person']}! ☕',
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ChatPage(
+                              matchName: match['person'].toString(),
+                              activity: match['title'].toString(),
+                              place: match['place'].toString(),
                             ),
-                            backgroundColor: const Color(0xFF6C3EE8),
-                            behavior: SnackBarBehavior.floating,
                           ),
                         );
                       },
@@ -1178,11 +1184,14 @@ class _HomePageState extends State<HomePage> {
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Requested to join ${pin.author}! ✨'),
-                        backgroundColor: const Color(0xFF6C3EE8),
-                        behavior: SnackBarBehavior.floating,
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatPage(
+                          matchName: pin.author,
+                          activity: pin.title.replaceAll('\n', ' '),
+                          place: pin.category,
+                        ),
                       ),
                     );
                   },
@@ -1346,24 +1355,56 @@ class _HomePageState extends State<HomePage> {
                 child: const Icon(Icons.person, color: Colors.white, size: 40),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'John Ng',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                _userName,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const Text(
-                'Active Status: Open for coffee ☕',
-                style: TextStyle(color: Color(0xFF6C3EE8), fontSize: 13),
+              Text(
+                'Active Status: $_userStatus',
+                style: const TextStyle(color: Color(0xFF6C3EE8), fontSize: 13),
               ),
               const SizedBox(height: 20),
               ListTile(
                 leading: const Icon(Icons.edit, color: Color(0xFF6C3EE8)),
                 title: const Text('Edit Profile & Status'),
-                onTap: () => Navigator.pop(context),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await Navigator.push<Map<String, String>>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditProfilePage(
+                        currentName: _userName,
+                        currentStatus: _userStatus,
+                      ),
+                    ),
+                  );
+                  if (result != null && mounted) {
+                    setState(() {
+                      _userName = result['name'] ?? _userName;
+                      _userStatus = result['status'] ?? _userStatus;
+                    });
+                  }
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.settings, color: Color(0xFF6C3EE8)),
                 title: const Text('Settings & Privacy'),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => SettingsPage(
+                        onLogOut: () {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(builder: (_) => const AuthPage()),
+                            (route) => false,
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -1410,7 +1451,18 @@ class _HomePageState extends State<HomePage> {
                 ),
                 title: const Text('Elena accepted your coffee request!'),
                 subtitle: const Text('10 mins ago'),
-                onTap: () => Navigator.pop(context),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChatPage(
+                        matchName: 'Elena R.',
+                        activity: 'Coffee Meetup',
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),

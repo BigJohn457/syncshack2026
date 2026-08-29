@@ -28,6 +28,7 @@ class DateTimeSetupPage extends StatefulWidget {
 }
 
 class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
+  final _formKey = GlobalKey<FormState>();
   final _activityController = TextEditingController();
   final _peopleController = TextEditingController();
   final _placeController = TextEditingController();
@@ -73,97 +74,126 @@ class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
             ),
             SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _TopBar(
-                    currentUserAvatarUrl: widget.currentUserAvatarUrl,
-                    onBack: widget.onBack,
-                  ),
-                  const SizedBox(height: 28),
-                  const Text(
-                    'What do you\nwant to do today?',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w800,
-                      height: 1.15,
-                      color: _kHeading,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _TopBar(
+                      currentUserAvatarUrl: widget.currentUserAvatarUrl,
+                      onBack: widget.onBack,
                     ),
-                  ),
-                  const SizedBox(height: 28),
-                  _FieldPill(
-                    icon: Icons.auto_fix_high,
-                    hint: 'Activity',
-                    controller: _activityController,
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _FieldPill(
-                          icon: Icons.people_alt_rounded,
-                          hint: 'Number of people',
-                          controller: _peopleController,
-                          keyboardType: TextInputType.number,
-                        ),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'What do you\nwant to do today?',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        height: 1.15,
+                        color: _kHeading,
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _FieldPill(
-                          icon: Icons.location_on_rounded,
-                          hint: 'Place',
-                          controller: _placeController,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _SelectTimeCard(
-                    hour: _hour,
-                    minute: _minute,
-                    isAm: _isAm,
-                    onHourTap: _cycleHour,
-                    onMinuteTap: _cycleMinute,
-                    onAmSelected: () => setState(() => _isAm = true),
-                    onPmSelected: () => setState(() => _isAm = false),
-                    onCancel: () => setState(() {
-                      _hour = 8;
-                      _minute = 30;
-                      _isAm = true;
-                    }),
-                  ),
-                  const SizedBox(height: 28),
-                  _RequestMeetupButton(
-                    onPressed: () {
-                      widget.onRequestMeetup?.call(
-                        _activityController.text,
-                        _peopleController.text,
-                        _placeController.text,
-                        _hour,
-                        _minute,
-                        _isAm,
-                      );
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SearchingPage(
-                            activity: _activityController.text.isNotEmpty
-                                ? _activityController.text
-                                : 'Grab coffee ☕',
-                            people: _peopleController.text.isNotEmpty
-                                ? _peopleController.text
-                                : '2',
-                            place: _placeController.text.isNotEmpty
-                                ? _placeController.text
-                                : 'Sydney CBD',
-                            time:
-                                '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')} ${_isAm ? "AM" : "PM"}',
+                    ),
+                    const SizedBox(height: 28),
+                    _FieldPill(
+                      icon: Icons.auto_fix_high,
+                      hint: 'Activity',
+                      controller: _activityController,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Required';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _FieldPill(
+                            icon: Icons.people_alt_rounded,
+                            hint: 'Number of people',
+                            controller: _peopleController,
+                            keyboardType: TextInputType.number,
+                            validator: (value) {
+                              final n = int.tryParse(value?.trim() ?? '');
+                              if (n == null || n <= 0) {
+                                return 'Enter a number';
+                              }
+                              return null;
+                            },
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ],
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: _FieldPill(
+                            icon: Icons.location_on_rounded,
+                            hint: 'Place',
+                            controller: _placeController,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Required';
+                              }
+                              return null;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _SelectTimeCard(
+                      hour: _hour,
+                      minute: _minute,
+                      isAm: _isAm,
+                      onHourTap: _cycleHour,
+                      onMinuteTap: _cycleMinute,
+                      onAmSelected: () => setState(() => _isAm = true),
+                      onPmSelected: () => setState(() => _isAm = false),
+                      onCancel: () => setState(() {
+                        _hour = 8;
+                        _minute = 30;
+                        _isAm = true;
+                      }),
+                      onOk: () {
+                        FocusScope.of(context).unfocus();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Time set to ${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')} ${_isAm ? 'AM' : 'PM'}',
+                            ),
+                            duration: const Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 28),
+                    _RequestMeetupButton(
+                      onPressed: () {
+                        if (!_formKey.currentState!.validate()) return;
+                        widget.onRequestMeetup?.call(
+                          _activityController.text,
+                          _peopleController.text,
+                          _placeController.text,
+                          _hour,
+                          _minute,
+                          _isAm,
+                        );
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SearchingPage(
+                              activity: _activityController.text,
+                              people: _peopleController.text,
+                              place: _placeController.text,
+                              time:
+                                  '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')} ${_isAm ? "AM" : "PM"}',
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -235,12 +265,14 @@ class _FieldPill extends StatelessWidget {
   final String hint;
   final TextEditingController controller;
   final TextInputType? keyboardType;
+  final String? Function(String?)? validator;
 
   const _FieldPill({
     required this.icon,
     required this.hint,
     required this.controller,
     this.keyboardType,
+    this.validator,
   });
 
   @override
@@ -271,9 +303,10 @@ class _FieldPill extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: TextField(
+            child: TextFormField(
               controller: controller,
               keyboardType: keyboardType,
+              validator: validator,
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -288,6 +321,7 @@ class _FieldPill extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   color: _kHeading.withOpacity(0.35),
                 ),
+                errorStyle: const TextStyle(fontSize: 10.5, color: Color(0xFFE0736A)),
               ),
             ),
           ),
@@ -306,6 +340,7 @@ class _SelectTimeCard extends StatelessWidget {
   final VoidCallback onAmSelected;
   final VoidCallback onPmSelected;
   final VoidCallback onCancel;
+  final VoidCallback onOk;
 
   const _SelectTimeCard({
     required this.hour,
@@ -316,6 +351,7 @@ class _SelectTimeCard extends StatelessWidget {
     required this.onAmSelected,
     required this.onPmSelected,
     required this.onCancel,
+    required this.onOk,
   });
 
   @override
@@ -420,7 +456,7 @@ class _SelectTimeCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               TextButton(
-                onPressed: () {},
+                onPressed: onOk,
                 child: const Text(
                   'OK',
                   style: TextStyle(
