@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from flask import Flask, current_app
+from flask import Flask, current_app, request
 from werkzeug.exceptions import HTTPException
 
 
@@ -35,7 +35,11 @@ def configure_logging(app: Flask) -> None:
     def log_unhandled_exception(exc: Exception):
         if isinstance(exc, HTTPException):
             app.logger.warning(
-                "HTTP exception: %s", exc, exc_info=(type(exc), exc, exc.__traceback__)
+                "HTTP exception: %s %s -> %s",
+                request.method,
+                request.full_path.rstrip("?"),
+                exc,
+                exc_info=(type(exc), exc, exc.__traceback__),
             )
             return exc
 

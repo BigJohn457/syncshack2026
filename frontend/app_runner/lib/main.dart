@@ -62,6 +62,8 @@ class _HomePageState extends State<HomePage> {
   bool _profileQuestionsRequired = false;
   bool _matchmakingEnabled = false;
   bool _matchmakingInProgress = false;
+  bool _matchmakingCheckPending = false;
+  List<NearbyRequest> _latestNearbyRequests = const [];
   final Set<String> _seenMatchRequestIds = {};
   final Set<String> _rejectedMatchRequestIds = {};
   String _userStatus = '';
@@ -76,6 +78,7 @@ class _HomePageState extends State<HomePage> {
   static const LatLng _fallbackCenter = LatLng(-33.8688, 151.2093);
   static const double _defaultRadiusKm = 2;
   static const double _defaultZoom = 14.5;
+  static const int _minimumMatchScore = 60;
   LatLng? _userLocation;
   LatLng? _searchCenter;
   double _radiusKm = _defaultRadiusKm;
@@ -245,13 +248,20 @@ class _HomePageState extends State<HomePage> {
           );
         }).toList();
       });
-      await _checkNewMatches(requests);
+      // Commit the marker layer first. Matchmaking starts only after Flutter
+      // has had an opportunity to paint the newly fetched request bubbles.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_checkNewMatches(requests));
+      });
     } on AuthException catch (error) {
       if (!silent && mounted && generation == _requestGeneration) {
         setState(() => _mapError = error.message);
       }
     } finally {
-      if (!silent && mounted && generation == _requestGeneration) {
+      // Always release a foreground loading indicator. A newer map fetch may
+      // supersede this response, but it must not leave the homepage stuck in
+      // "Loading nearby requests..." and block the one-second poller.
+      if (!silent && mounted) {
         setState(() => _loadingRequests = false);
       }
     }
@@ -276,7 +286,14 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _checkNewMatches(List<NearbyRequest> requests) async {
-    if (!_matchmakingEnabled || _matchmakingInProgress) return;
+    _latestNearbyRequests = requests;
+    if (!_matchmakingEnabled) return;
+    if (_matchmakingInProgress) {
+      // A request may arrive while DeepSeek is scoring the previous batch.
+      // Queue one more pass so that newly fetched requests are not missed.
+      _matchmakingCheckPending = true;
+      return;
+    }
     final currentUserId = AuthSession.currentUserId;
     if (currentUserId == null || currentUserId.isEmpty) return;
     final newRequests = requests
@@ -295,7 +312,13 @@ class _HomePageState extends State<HomePage> {
         currentUserId: currentUserId,
         userIds: newRequests.map((request) => request.creatorId).toList(),
       );
-      if (!mounted || !_matchmakingEnabled || result == null) return;
+      if (!mounted ||
+          !_matchmakingEnabled ||
+          result == null ||
+          result.score <= _minimumMatchScore ||
+          ModalRoute.of(context)?.isCurrent != true) {
+        return;
+      }
       NearbyRequest? matchedRequest;
       for (final request in newRequests) {
         if (request.creatorId == result.userId) {
@@ -316,6 +339,10 @@ class _HomePageState extends State<HomePage> {
       // Background matchmaking must not interrupt normal map use.
     } finally {
       _matchmakingInProgress = false;
+      if (_matchmakingCheckPending && mounted && _matchmakingEnabled) {
+        _matchmakingCheckPending = false;
+        unawaited(_checkNewMatches(_latestNearbyRequests));
+      }
     }
   }
 
@@ -1098,7 +1125,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // -------------------------------------------------------------
-  // BOTTOM BUTTON: "+ New Meetup Request" -> DateTimeSetupPage
+  // BOTTOM BUTTON: "Request" -> DateTimeSetupPage
   // -------------------------------------------------------------
   Widget _buildNewMeetupButton() {
     return GestureDetector(
@@ -1146,8 +1173,10 @@ class _HomePageState extends State<HomePage> {
         );
       },
       child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 26),
+        width: 184,
+        height: 60,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 32),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF5A25E6), Color(0xFF8E45FF)],
@@ -1164,25 +1193,14 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(
-              Icons.add_circle_outline_rounded,
-              color: Colors.white,
-              size: 21,
-            ),
-            SizedBox(width: 9),
-            Text(
-              'Request',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.1,
-              ),
-            ),
-          ],
+        child: const Text(
+          'Request',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.1,
+          ),
         ),
       ),
     );
@@ -1521,44 +1539,47 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 12),
 
               ..._pins.map(
-                (p) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFEFF1FE),
-                      shape: BoxShape.circle,
+                (p) => Material(
+                  color: Colors.transparent,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEFF1FE),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.location_on,
+                        color: Color(0xFF6C3EE8),
+                        size: 20,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.location_on,
+                    title: Text(
+                      p.title.replaceAll('\n', ' '),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${p.author} • ${p.time} (${p.distance})',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right,
                       color: Color(0xFF6C3EE8),
-                      size: 20,
                     ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _selectedPinId = p.id;
+                      });
+                      _mapController.move(p.location, 15.5);
+                      _showPinDetailSheet(p);
+                    },
                   ),
-                  title: Text(
-                    p.title.replaceAll('\n', ' '),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  subtitle: Text(
-                    '${p.author} • ${p.time} (${p.distance})',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  trailing: const Icon(
-                    Icons.chevron_right,
-                    color: Color(0xFF6C3EE8),
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _selectedPinId = p.id;
-                    });
-                    _mapController.move(p.location, 15.5);
-                    _showPinDetailSheet(p);
-                  },
                 ),
               ),
             ],
@@ -1629,47 +1650,55 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               const SizedBox(height: 20),
-              ListTile(
-                leading: const Icon(Icons.edit, color: Color(0xFF6C3EE8)),
-                title: const Text('Edit Profile & Status'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final result = await Navigator.push<Map<String, String>>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EditProfilePage(
-                        currentName: _userName,
-                        currentStatus: _userStatus,
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.edit, color: Color(0xFF6C3EE8)),
+                  title: const Text('Edit Profile & Status'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final result = await Navigator.push<Map<String, String>>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditProfilePage(
+                          currentName: _userName,
+                          currentStatus: _userStatus,
+                        ),
                       ),
-                    ),
-                  );
-                  if (result != null && mounted) {
-                    setState(() {
-                      _userName = result['name'] ?? _userName;
-                      _userStatus = result['status'] ?? _userStatus;
-                    });
-                  }
-                },
+                    );
+                    if (result != null && mounted) {
+                      setState(() {
+                        _userName = result['name'] ?? _userName;
+                        _userStatus = result['status'] ?? _userStatus;
+                      });
+                    }
+                  },
+                ),
               ),
-              ListTile(
-                leading: const Icon(Icons.settings, color: Color(0xFF6C3EE8)),
-                title: const Text('Settings & Privacy'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => SettingsPage(
-                        onLogOut: () {
-                          Navigator.of(context).pushAndRemoveUntil(
-                            MaterialPageRoute(builder: (_) => const AuthPage()),
-                            (route) => false,
-                          );
-                        },
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: const Icon(Icons.settings, color: Color(0xFF6C3EE8)),
+                  title: const Text('Settings & Privacy'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SettingsPage(
+                          onLogOut: () {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (_) => const AuthPage(),
+                              ),
+                              (route) => false,
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -1709,11 +1738,14 @@ class _HomePageState extends State<HomePage> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 14),
-              const ListTile(
-                leading: Icon(Icons.notifications_none_rounded),
-                title: Text('No notifications yet'),
-                subtitle: Text(
-                  'Notifications will appear when the backend provides them.',
+              const Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  leading: Icon(Icons.notifications_none_rounded),
+                  title: Text('No notifications yet'),
+                  subtitle: Text(
+                    'Notifications will appear when the backend provides them.',
+                  ),
                 ),
               ),
             ],
