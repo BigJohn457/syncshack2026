@@ -27,6 +27,7 @@ from .meetup_repository import (
 )
 from .request_repository import (
     RequestCancellationError,
+    RequestJoinError,
     RequestNotFoundError,
     RequestPermissionError,
     RequestRepository,
@@ -65,6 +66,7 @@ __all__ = [
     "RatingRepository",
     "RequestNotFoundError",
     "RequestCancellationError",
+    "RequestJoinError",
     "RequestPermissionError",
     "RequestRepository",
     "SystemRepository",

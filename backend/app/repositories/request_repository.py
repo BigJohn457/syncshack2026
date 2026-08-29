@@ -1,6 +1,7 @@
 import json
 from collections.abc import Callable
 from math import asin, cos, radians, sin, sqrt
+from uuid import uuid4
 
 from app.database import get_db_connection
 from app.models import MeetupRequest
@@ -35,6 +36,10 @@ class RequestPermissionError(Exception):
 
 
 class RequestCancellationError(Exception):
+    pass
+
+
+class RequestJoinError(Exception):
     pass
 
 
@@ -249,6 +254,152 @@ class RequestRepository:
         except Exception:
             connection.rollback()
             raise
+        finally:
+            cursor.close()
+            connection.close()
+
+    def join(self, request_id: str, user_id: str) -> dict[str, str]:
+        """Create the pending participant row and return its meetup ID."""
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT creator_id, status
+                FROM requests
+                WHERE request_id = %s
+                LIMIT 1
+                FOR UPDATE
+                """,
+                (request_id,),
+            )
+            meetup_request = cursor.fetchone()
+            if meetup_request is None:
+                raise RequestNotFoundError(request_id)
+            if meetup_request["creator_id"] == user_id:
+                raise RequestJoinError("request creators cannot join their own request")
+            if meetup_request["status"] != "open":
+                raise RequestJoinError(
+                    f"request is not open (status: {meetup_request['status']})"
+                )
+
+            cursor.execute("SELECT 1 FROM users WHERE id = %s LIMIT 1", (user_id,))
+            if cursor.fetchone() is None:
+                raise UserNotFoundError(user_id)
+
+            cursor.execute(
+                "SELECT meetup_id FROM meetups WHERE request_id = %s LIMIT 1",
+                (request_id,),
+            )
+            meetup = cursor.fetchone()
+            if meetup is None:
+                meetup_id = str(uuid4())
+                cursor.execute(
+                    """
+                    INSERT INTO meetups (meetup_id, request_id, status)
+                    VALUES (%s, %s, 'matched')
+                    """,
+                    (meetup_id, request_id),
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO meetup_participants (
+                        meetup_id, user_id, attendance_status, is_reveal
+                    ) VALUES (%s, %s, 'joined', FALSE)
+                    ON DUPLICATE KEY UPDATE attendance_status = 'joined'
+                    """,
+                    (meetup_id, meetup_request["creator_id"]),
+                )
+            else:
+                meetup_id = meetup["meetup_id"]
+
+            cursor.execute(
+                """
+                SELECT status FROM request_participants
+                WHERE request_id = %s AND user_id = %s
+                LIMIT 1
+                FOR UPDATE
+                """,
+                (request_id, user_id),
+            )
+            participant = cursor.fetchone()
+            if participant is None:
+                cursor.execute(
+                    """
+                    INSERT INTO request_participants (request_id, user_id, status)
+                    VALUES (%s, %s, 'pending')
+                    """,
+                    (request_id, user_id),
+                )
+                invitation_status = "pending"
+            elif participant["status"] == "accepted":
+                invitation_status = "accepted"
+            else:
+                cursor.execute(
+                    """
+                    UPDATE request_participants
+                    SET status = 'pending'
+                    WHERE request_id = %s AND user_id = %s
+                    """,
+                    (request_id, user_id),
+                )
+                invitation_status = "pending"
+
+            connection.commit()
+            return {
+                "request_id": request_id,
+                "meetup_id": meetup_id,
+                "invitation_status": invitation_status,
+            }
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            cursor.close()
+            connection.close()
+
+    def get_status(self, request_id: str, user_id: str) -> dict:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    r.request_id,
+                    r.creator_id,
+                    r.status AS request_status,
+                    r.max_people,
+                    m.meetup_id,
+                    m.status AS meetup_status,
+                    (
+                        SELECT COUNT(*)
+                        FROM request_participants AS rp
+                        WHERE rp.request_id = r.request_id
+                          AND rp.status = 'accepted'
+                    ) AS accepted_count
+                FROM requests AS r
+                LEFT JOIN meetups AS m ON m.request_id = r.request_id
+                WHERE r.request_id = %s
+                LIMIT 1
+                """,
+                (request_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise RequestNotFoundError(request_id)
+            if row["creator_id"] != user_id:
+                raise RequestPermissionError()
+
+            return {
+                "request_id": row["request_id"],
+                "meetup_id": row["meetup_id"],
+                "request_status": row["request_status"],
+                "meetup_status": row["meetup_status"],
+                "accepted_count": int(row["accepted_count"]),
+                "max_people": int(row["max_people"]),
+            }
         finally:
             cursor.close()
             connection.close()

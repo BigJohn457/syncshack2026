@@ -139,6 +139,49 @@ def test_cancel_request_returns_cancelled_status(monkeypatch):
     }
 
 
+def test_join_request_requires_user_identity():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post("/api/request/post/join-request", json={})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "X-User-ID header is required"
+
+
+def test_join_request_returns_meetup_for_acceptance(monkeypatch):
+    import importlib
+
+    request_routes = importlib.import_module("app.routes.request")
+    monkeypatch.setattr(
+        request_routes.request_repository,
+        "join",
+        lambda request_id, user_id: {
+            "request_id": request_id,
+            "meetup_id": "meetup-001",
+            "invitation_status": "pending",
+        },
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/request/post/join-request",
+            json={"request_id": "request-001"},
+            headers={"X-User-ID": "user-123"},
+        )
+
+    assert response.status_code == 201
+    assert response.get_json() == {
+        "success": True,
+        "data": {
+            "request_id": "request-001",
+            "meetup_id": "meetup-001",
+            "invitation_status": "pending",
+        },
+    }
+
+
 def test_get_all_messages_requires_meetup_id():
     app = create_app("testing")
 

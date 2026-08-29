@@ -1,9 +1,14 @@
 import json
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from mysql.connector import Error as MySQLError
 
-from app.repositories import RequestNotFoundError, RequestRepository, SystemRepository
+from app.repositories import (
+    RequestNotFoundError,
+    RequestPermissionError,
+    RequestRepository,
+    SystemRepository,
+)
 from app.logging_config import log_handled_exception
 from ._helpers import read_varchar_id
 
@@ -63,3 +68,30 @@ def get_own_request():
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(success=True, data=own_request), 200
+
+
+@home.get("/get/request-status")
+def get_request_status():
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="X-User-ID header is required"), 400
+
+    try:
+        request_id = read_varchar_id(request, "request_id")
+        status = request_repository.get_status(request_id, user_id)
+    except ValueError as exc:
+        log_handled_exception("Request status validation failed", exc)
+        return jsonify(success=False, error=str(exc)), 400
+    except RequestNotFoundError as exc:
+        log_handled_exception("Request status not found", exc)
+        return jsonify(success=False, error="request not found"), 404
+    except RequestPermissionError as exc:
+        log_handled_exception("Request status permission denied", exc)
+        return jsonify(success=False, error="only the creator can view request status"), 403
+    except MySQLError as exc:
+        log_handled_exception("Request status database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+
+    return jsonify(success=True, data=status), 200

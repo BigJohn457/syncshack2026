@@ -7,6 +7,7 @@ from app.models import MeetupRequest
 from app.logging_config import log_handled_exception
 from app.repositories import (
     RequestCancellationError,
+    RequestJoinError,
     RequestNotFoundError,
     RequestPermissionError,
     RequestRepository,
@@ -130,3 +131,33 @@ def cancel_request():
         message="Request cancelled successfully",
         data=cancelled,
     ), 200
+
+
+@request.post("/post/join-request")
+def join_request():
+    user_id = str(
+        session.get("user_id") or flask_request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="X-User-ID header is required"), 400
+
+    try:
+        request_id = read_varchar_id(flask_request, "request_id")
+        joined = request_repository.join(request_id, user_id)
+    except ValueError as exc:
+        log_handled_exception("Join request validation failed", exc)
+        return jsonify(success=False, error=str(exc)), 400
+    except RequestNotFoundError as exc:
+        log_handled_exception("Join request not found", exc)
+        return jsonify(success=False, error="request not found"), 404
+    except UserNotFoundError as exc:
+        log_handled_exception("Join request user not found", exc)
+        return jsonify(success=False, error="user not found"), 404
+    except RequestJoinError as exc:
+        log_handled_exception("Join request rejected", exc)
+        return jsonify(success=False, error=str(exc)), 409
+    except MySQLError as exc:
+        log_handled_exception("Join request database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+
+    return jsonify(success=True, data=joined), 201
