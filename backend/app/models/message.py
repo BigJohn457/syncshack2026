@@ -8,11 +8,15 @@ from zoneinfo import ZoneInfo
 class MessageSender:
     anonymous_name: str
     img_url: str | None
+    real_name: str | None = None
+    is_reveal: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "anonymous_name": self.anonymous_name,
             "img_url": self.img_url,
+            "real_name": self.real_name,
+            "is_reveal": self.is_reveal,
         }
 
 

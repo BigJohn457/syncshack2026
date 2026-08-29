@@ -11,6 +11,7 @@ class MeetupChatMessage {
     required this.id,
     required this.senderId,
     required this.senderName,
+    required this.senderIsRevealed,
     required this.message,
     required this.createdAt,
     this.senderImageUrl,
@@ -19,6 +20,7 @@ class MeetupChatMessage {
   final String id;
   final String senderId;
   final String senderName;
+  final bool senderIsRevealed;
   final String? senderImageUrl;
   final String message;
   final DateTime? createdAt;
@@ -29,11 +31,17 @@ class MeetupChatMessage {
         ? sender
         : const <String, dynamic>{};
     final imageUrl = senderData['img_url']?.toString().trim();
+    final isRevealed =
+        senderData['is_reveal'] == true || senderData['is_reveal'] == 1;
+    final realName = senderData['real_name']?.toString().trim() ?? '';
+    final anonymousName = senderData['anonymous_name']?.toString().trim() ?? '';
     return MeetupChatMessage(
       id: json['id']?.toString() ?? '',
       senderId: json['sender_id']?.toString() ?? '',
-      senderName:
-          senderData['anonymous_name']?.toString() ?? 'Anonymous member',
+      senderName: isRevealed && realName.isNotEmpty
+          ? realName
+          : (anonymousName.isEmpty ? 'Anonymous member' : anonymousName),
+      senderIsRevealed: isRevealed,
       senderImageUrl: imageUrl == null || imageUrl.isEmpty ? null : imageUrl,
       message: json['message']?.toString() ?? '',
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),

@@ -35,6 +35,9 @@ class MeetupChatRepository:
                     m.id,
                     m.sender_id,
                     u.anonymous_name,
+                    TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')))
+                        AS real_name,
+                    COALESCE(mp.is_reveal, FALSE) AS is_reveal,
                     COALESCE(
                         u.profile_image_url,
                         u.img_url_face,
@@ -44,6 +47,8 @@ class MeetupChatRepository:
                     m.created_at
                 FROM messages AS m
                 INNER JOIN users AS u ON u.id = m.sender_id
+                LEFT JOIN meetup_participants AS mp
+                    ON mp.meetup_id = m.meetup_id AND mp.user_id = m.sender_id
                 WHERE m.meetup_id = %s
                 ORDER BY m.created_at ASC, m.id ASC
                 """,
@@ -56,6 +61,8 @@ class MeetupChatRepository:
                     sender=MessageSender(
                         anonymous_name=row["anonymous_name"],
                         img_url=row["img_url"],
+                        real_name=row["real_name"] or None,
+                        is_reveal=bool(row["is_reveal"]),
                     ),
                     message=row["message"],
                     created_at=row["created_at"],
@@ -116,6 +123,9 @@ class MeetupChatRepository:
                     m.id,
                     m.sender_id,
                     u.anonymous_name,
+                    TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')))
+                        AS real_name,
+                    COALESCE(mp.is_reveal, FALSE) AS is_reveal,
                     COALESCE(
                         u.profile_image_url,
                         u.img_url_face,
@@ -125,6 +135,8 @@ class MeetupChatRepository:
                     m.created_at
                 FROM messages AS m
                 INNER JOIN users AS u ON u.id = m.sender_id
+                LEFT JOIN meetup_participants AS mp
+                    ON mp.meetup_id = m.meetup_id AND mp.user_id = m.sender_id
                 WHERE m.id = %s
                 LIMIT 1
                 """,
@@ -138,6 +150,8 @@ class MeetupChatRepository:
                 sender=MessageSender(
                     anonymous_name=row["anonymous_name"],
                     img_url=row["img_url"],
+                    real_name=row["real_name"] or None,
+                    is_reveal=bool(row["is_reveal"]),
                 ),
                 message=row["message"],
                 created_at=row["created_at"],

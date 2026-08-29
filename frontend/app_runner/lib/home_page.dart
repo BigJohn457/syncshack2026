@@ -360,8 +360,6 @@ class _HomePageState extends State<HomePage> {
       children: [
         Row(
           children: const [
-            Icon(Icons.auto_awesome, color: Color(0xFF6C3EE8), size: 20),
-            SizedBox(width: 8),
             Text(
               'Your top match',
               style: TextStyle(
@@ -375,7 +373,7 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Someone you might want to meet right now ✨',
+          'Someone you might want to meet right now',
           style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w400,
@@ -578,22 +576,6 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-          ),
-        ),
-        const Positioned(
-          top: 2,
-          right: 0,
-          child: Text(
-            '✦',
-            style: TextStyle(color: Color(0xFF9F75FF), fontSize: 10),
-          ),
-        ),
-        const Positioned(
-          bottom: 2,
-          left: 0,
-          child: Text(
-            '✦',
-            style: TextStyle(color: Color(0xFF9F75FF), fontSize: 10),
           ),
         ),
       ],
@@ -1021,7 +1003,7 @@ class _HomePageState extends State<HomePage> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Requested to join ${pin.author}! ✨'),
+                        content: Text('Requested to join ${pin.author}!'),
                         backgroundColor: const Color(0xFF6C3EE8),
                         behavior: SnackBarBehavior.floating,
                       ),

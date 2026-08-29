@@ -6,6 +6,7 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 
 import 'package:app_runner/main.dart';
 
@@ -17,6 +18,8 @@ void main() {
 
     expect(find.text('Welcome back!'), findsOneWidget);
     expect(find.text('Log In'), findsOneWidget);
+    expect(find.text('Hey!'), findsOneWidget);
+    expect(find.byIcon(Icons.auto_awesome), findsNothing);
     expect(find.text('New to Hey? Sign Up'), findsOneWidget);
   });
 }

@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Meetup App',
+      title: 'Hey!',
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'SF Pro Display',
@@ -363,7 +363,7 @@ class _HomePageState extends State<HomePage> {
           children: [
             CircleAvatar(
               backgroundColor: Color(0xFFEDE7FF),
-              child: Icon(Icons.auto_awesome, color: Color(0xFF6C3EE8)),
+              child: Icon(Icons.people_alt_rounded, color: Color(0xFF6C3EE8)),
             ),
             SizedBox(width: 12),
             Expanded(
@@ -520,7 +520,7 @@ class _HomePageState extends State<HomePage> {
                   Text(
                     _loadingRequests
                         ? 'Loading nearby requests...'
-                        : '${_pins.length} nearby meet up request${_pins.length == 1 ? '' : 's'}',
+                        : '${_pins.length} nearby request${_pins.length == 1 ? '' : 's'}',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -836,8 +836,6 @@ class _HomePageState extends State<HomePage> {
       children: [
         Row(
           children: const [
-            Icon(Icons.auto_awesome, color: Color(0xFF6C3EE8), size: 20),
-            SizedBox(width: 8),
             Text(
               'Your top match',
               style: TextStyle(
@@ -851,7 +849,7 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 4),
         const Text(
-          'Someone you might want to meet right now ✨',
+          'Someone you might want to meet right now',
           style: TextStyle(
             fontSize: 13.5,
             fontWeight: FontWeight.w400,
@@ -1056,22 +1054,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ),
-        const Positioned(
-          top: 2,
-          right: 0,
-          child: Text(
-            '✦',
-            style: TextStyle(color: Color(0xFF9F75FF), fontSize: 10),
-          ),
-        ),
-        const Positioned(
-          bottom: 2,
-          left: 0,
-          child: Text(
-            '✦',
-            style: TextStyle(color: Color(0xFF9F75FF), fontSize: 10),
-          ),
-        ),
       ],
     );
   }
@@ -1198,7 +1180,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // -------------------------------------------------------------
-  // BOTTOM BUTTON: "Request" -> DateTimeSetupPage
+  // BOTTOM BUTTON: "Request Friend" -> DateTimeSetupPage
   // -------------------------------------------------------------
   Widget _buildNewMeetupButton() {
     return GestureDetector(
@@ -1246,7 +1228,7 @@ class _HomePageState extends State<HomePage> {
         );
       },
       child: Container(
-        width: 184,
+        width: 230,
         height: 60,
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -1267,7 +1249,9 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
         child: const Text(
-          'Request',
+          'Request Friend',
+          maxLines: 1,
+          softWrap: false,
           style: TextStyle(
             color: Colors.white,
             fontSize: 18,

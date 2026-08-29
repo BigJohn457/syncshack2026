@@ -108,13 +108,17 @@ class _ChatPageState extends State<ChatPage> {
         message.senderId == AuthSession.currentUserId;
     return ChatMessage(
       id: message.id,
-      sender: isMe ? 'You (Anonymous)' : message.senderName,
+      sender: isMe
+          ? (_ownProfileRevealed ? 'You' : 'You (Anonymous)')
+          : message.senderName,
       text: message.message,
       time: _formatTime(message.createdAt),
       isMe: isMe,
       avatarColor: _avatarColor(message.senderId),
       avatarEmoji: isMe ? '🕵️' : '👤',
-      avatarUrl: _revealedUserIds.contains(message.senderId)
+      avatarUrl:
+          (message.senderIsRevealed ||
+              _revealedUserIds.contains(message.senderId))
           ? message.senderImageUrl
           : null,
     );
@@ -321,7 +325,6 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final topPadding = mediaQuery.padding.top;
 
     return PopScope(
       canPop: false,
@@ -343,32 +346,6 @@ class _ChatPageState extends State<ChatPage> {
                     end: Alignment.bottomCenter,
                   ),
                 ),
-              ),
-            ),
-
-            // Floating Decorative Sparkles
-            Positioned(
-              top: topPadding + 42,
-              right: 135,
-              child: const Text(
-                '✦',
-                style: TextStyle(color: Color(0xFFBCA7FB), fontSize: 13),
-              ),
-            ),
-            Positioned(
-              top: topPadding + 58,
-              left: 145,
-              child: const Text(
-                '✦',
-                style: TextStyle(color: Color(0xFFBCA7FB), fontSize: 11),
-              ),
-            ),
-            Positioned(
-              top: topPadding + 140,
-              right: 32,
-              child: const Text(
-                '✦',
-                style: TextStyle(color: Color(0xFFC9B6FD), fontSize: 14),
               ),
             ),
 
@@ -815,14 +792,6 @@ class _ChatPageState extends State<ChatPage> {
                             fontWeight: FontWeight.w800,
                             color: Color(0xFF241B3A),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 3),
-                      const Text(
-                        '✦',
-                        style: TextStyle(
-                          color: Color(0xFF8B64F8),
-                          fontSize: 10.5,
                         ),
                       ),
                     ],

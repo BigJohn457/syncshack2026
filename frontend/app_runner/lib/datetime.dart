@@ -239,24 +239,6 @@ class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
       body: SafeArea(
         child: Stack(
           children: [
-            Positioned(
-              top: 60,
-              right: 120,
-              child: Icon(
-                Icons.auto_awesome,
-                color: _kPurple.withValues(alpha: 0.5),
-                size: 22,
-              ),
-            ),
-            Positioned(
-              top: 92,
-              right: 96,
-              child: Icon(
-                Icons.auto_awesome,
-                color: _kPurple.withValues(alpha: 0.35),
-                size: 14,
-              ),
-            ),
             SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: Form(

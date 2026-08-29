@@ -42,24 +42,6 @@ class _SignUpPageState extends State<SignUpPage> {
       body: SafeArea(
         child: Stack(
           children: [
-            Positioned(
-              top: 40,
-              right: 40,
-              child: Icon(
-                Icons.auto_awesome,
-                color: _kPurple.withOpacity(0.5),
-                size: 20,
-              ),
-            ),
-            Positioned(
-              top: 76,
-              right: 64,
-              child: Icon(
-                Icons.auto_awesome,
-                color: _kPurple.withOpacity(0.35),
-                size: 12,
-              ),
-            ),
             SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: Column(
@@ -195,23 +177,6 @@ class _BrandMark extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: _kPurple,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                color: _kPurple.withOpacity(0.35),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
-        ),
-        const SizedBox(width: 10),
         const Text(
           'hey!',
           style: TextStyle(

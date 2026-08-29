@@ -200,7 +200,6 @@ class _GpInfoPageState extends State<GpInfoPage> {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final topPadding = mediaQuery.padding.top;
 
     return Scaffold(
       backgroundColor: _kCream,
@@ -223,42 +222,11 @@ class _GpInfoPageState extends State<GpInfoPage> {
             ),
           ),
 
-          // Floating Decorative Sparkles
-          Positioned(
-            top: topPadding + 62,
-            right: 68,
-            child: const Text(
-              '✦',
-              style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 13),
-            ),
-          ),
-          Positioned(
-            top: topPadding + 155,
-            left: 28,
-            child: const Text(
-              '✦',
-              style: TextStyle(color: Color(0xFFBCA7FB), fontSize: 15),
-            ),
-          ),
-          Positioned(
-            top: topPadding + 168,
-            left: 40,
-            child: const Text(
-              '✦',
-              style: TextStyle(color: Color(0xFFBCA7FB), fontSize: 11),
-            ),
-          ),
-          Positioned(
-            top: topPadding + 195,
-            right: 36,
-            child: const Text('💫', style: TextStyle(fontSize: 16)),
-          ),
-
           SafeArea(
             child: Column(
               children: [
                 // -------------------------------------------------------------
-                // TOP BAR: Left Back/Avatar, Center "hey! ✨", Right Group Icon
+                // TOP BAR: Left Back/Avatar, Center "Hey!", Right Group Icon
                 // -------------------------------------------------------------
                 Padding(
                   padding: const EdgeInsets.symmetric(
@@ -295,28 +263,14 @@ class _GpInfoPageState extends State<GpInfoPage> {
                         ),
                       ),
 
-                      // Center Brand Logo: hey! ✨
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'hey!',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w900,
-                              color: _kPurple,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          Transform.translate(
-                            offset: const Offset(0, -6),
-                            child: const Text(
-                              '✨',
-                              style: TextStyle(fontSize: 15),
-                            ),
-                          ),
-                        ],
+                      const Text(
+                        'Hey!',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          color: _kPurple,
+                          letterSpacing: -0.5,
+                        ),
                       ),
 
                       // Right Group Icon Pill Container
@@ -629,10 +583,6 @@ class _ParticipantCard extends StatelessWidget {
     final cardBorderColor = isAttending ? _kAttendingBorder : _kPendingBorder;
     final badgeTextColor = isAttending ? _kAttendingGreen : _kPendingYellow;
     final badgeLabel = isAttending ? 'ATTENDING!' : 'PENDING...';
-    final sparkleColor = isAttending
-        ? const Color(0xFF8B64F8)
-        : const Color(0xFFE5A117);
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(28),
@@ -731,24 +681,6 @@ class _ParticipantCard extends StatelessWidget {
                             letterSpacing: -0.2,
                           ),
                           overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '✦',
-                        style: TextStyle(
-                          color: sparkleColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        '✦',
-                        style: TextStyle(
-                          color: sparkleColor.withOpacity(0.7),
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],

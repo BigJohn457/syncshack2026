@@ -203,19 +203,13 @@ class _AuthPageState extends State<AuthPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.auto_awesome, color: _purple, size: 32),
-                        SizedBox(width: 10),
-                        Text(
-                          'hey!',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            color: _purple,
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'Hey!',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: _purple,
+                      ),
                     ),
                     const SizedBox(height: 30),
                     Text(
@@ -230,7 +224,7 @@ class _AuthPageState extends State<AuthPage> {
                     Text(
                       _isSignUp
                           ? 'Join Hey and start meeting up today.'
-                          : 'Log in to see what is happening today.',
+                          : "Login to see what's new!",
                       style: TextStyle(
                         color: _heading.withValues(alpha: .6),
                         fontSize: 15,

@@ -198,15 +198,9 @@ class _RatePageState extends State<RatePage> {
     _goHome();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Row(
-          children: [
-            Icon(Icons.star_rounded, color: Colors.amber, size: 22),
-            SizedBox(width: 8),
-            Text(
-              'Ratings submitted! Thanks for being part of the community ✨',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ],
+        content: const Text(
+          'Ratings submitted! Thanks for being part of the community.',
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
         backgroundColor: const Color(0xFF6C3EE8),
         behavior: SnackBarBehavior.floating,
@@ -250,7 +244,6 @@ class _RatePageState extends State<RatePage> {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final topPadding = mediaQuery.padding.top;
 
     return PopScope(
       canPop: false,
@@ -272,40 +265,6 @@ class _RatePageState extends State<RatePage> {
                     end: Alignment.bottomCenter,
                   ),
                 ),
-              ),
-            ),
-
-            // Floating Decorative Sparkles
-            Positioned(
-              top: topPadding + 65,
-              left: 20,
-              child: const Text(
-                '✦',
-                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14),
-              ),
-            ),
-            Positioned(
-              top: topPadding + 130,
-              right: 30,
-              child: const Text(
-                '✦',
-                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16),
-              ),
-            ),
-            Positioned(
-              bottom: 60,
-              left: 32,
-              child: const Text(
-                '✦',
-                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14),
-              ),
-            ),
-            Positioned(
-              bottom: 80,
-              right: 40,
-              child: const Text(
-                '✦',
-                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16),
               ),
             ),
 
@@ -488,7 +447,7 @@ class _RatePageState extends State<RatePage> {
                                 Text(
                                   _submitting
                                       ? 'Submitting...'
-                                      : 'Submit Ratings ✨',
+                                      : 'Submit Ratings',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,

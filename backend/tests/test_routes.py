@@ -303,6 +303,8 @@ def test_get_all_messages_returns_sender_details(monkeypatch):
     assert body["data"]["messages"][0]["sender"] == {
         "anonymous_name": "Blue Panda",
         "img_url": "https://example.com/avatar1.jpg",
+        "real_name": None,
+        "is_reveal": False,
     }
 
 
@@ -354,6 +356,8 @@ def test_send_message_returns_created_message(monkeypatch):
                 "sender": {
                     "anonymous_name": "Blue Panda",
                     "img_url": "https://example.com/avatar1.jpg",
+                    "real_name": None,
+                    "is_reveal": False,
                 },
                 "message": "Hello everyone!",
                 "created_at": "2026-08-29T12:25:14+10:00",

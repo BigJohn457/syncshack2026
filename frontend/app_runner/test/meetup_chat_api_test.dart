@@ -44,6 +44,40 @@ void main() {
     expect(messages.single.message, 'Hello!');
   });
 
+  test('uses the real sender name after the profile is revealed', () async {
+    final api = MeetupChatApi(
+      client: MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'messages': [
+                {
+                  'id': 'message-revealed',
+                  'sender_id': 'user-2',
+                  'sender': {
+                    'anonymous_name': 'Anonymous Koala',
+                    'real_name': 'Alex Morgan',
+                    'is_reveal': true,
+                    'img_url': null,
+                  },
+                  'message': 'Nice to meet you',
+                  'created_at': '2026-08-30T10:15:00+00:00',
+                },
+              ],
+            },
+          }),
+          200,
+        ),
+      ),
+    );
+
+    final messages = await api.fetchMessages('meetup-1');
+
+    expect(messages.single.senderName, 'Alex Morgan');
+    expect(messages.single.senderIsRevealed, isTrue);
+  });
+
   test('sends a message using the documented payload', () async {
     late http.Request captured;
     final api = MeetupChatApi(
