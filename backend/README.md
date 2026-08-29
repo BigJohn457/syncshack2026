@@ -46,7 +46,7 @@ The route modules and their base endpoints are:
 | `request.py` | `/api/request` |
 | `meetup_chat.py` | `/api/meetup-chat` |
 | `meetup.py` | `/api/meetups` |
-| `rating.py` | `/api/ratings` |
+| `rating.py` | `/api/rating` |
 | `users.py` | `/api/users` |
 
 ## Test
