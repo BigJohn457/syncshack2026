@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'rate.dart';
 
 // "hey!" brand palette & styling
 const _kPurple = Color(0xFF6C3EE8);
@@ -297,40 +298,80 @@ class GpInfoPage extends StatelessWidget {
                 ),
 
                 // -------------------------------------------------------------
-                // BOTTOM CANCEL BUTTON
+                // BOTTOM BUTTONS: Green "Finished" -> rate.dart + Red "Cancel"
                 // -------------------------------------------------------------
                 Padding(
                   padding: EdgeInsets.only(
-                    left: 24,
-                    right: 24,
-                    top: 10,
+                    left: 20,
+                    right: 20,
+                    top: 6,
                     bottom: mediaQuery.padding.bottom > 0
                         ? mediaQuery.padding.bottom + 8
-                        : 20,
+                        : 16,
                   ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Sparkles around cancel button
-                      Positioned(
-                        left: -14,
-                        bottom: 8,
-                        child: const Text('✦',
-                            style: TextStyle(
-                                color: Color(0xFFC7B3FD), fontSize: 14)),
-                      ),
-                      Positioned(
-                        right: -12,
-                        top: 2,
-                        child: const Text('✦',
-                            style: TextStyle(
-                                color: Color(0xFFC7B3FD), fontSize: 13)),
-                      ),
-
+                      // 🟢 Green "Finished" Button -> Goes to rate.dart
                       GestureDetector(
                         onTap: () {
-                          // Pop back to home screen and show cancellation notice
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const RatePage(
+                                meetupType: 'coffee meetup',
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          height: 54,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                Color(0xFF27AE60),
+                                Color(0xFF2ECC71),
+                              ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF27AE60).withOpacity(0.4),
+                                blurRadius: 16,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.check_circle_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Finished',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.1,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // 🔴 Red "Cancel Meetup" Button
+                      GestureDetector(
+                        onTap: () {
                           Navigator.of(context)
                               .popUntil((route) => route.isFirst);
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -352,42 +393,29 @@ class GpInfoPage extends StatelessWidget {
                           );
                         },
                         child: Container(
-                          height: 56,
+                          height: 48,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFFEA5B5B),
-                                Color(0xFFF36A6A),
-                              ],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
+                            color: const Color(0xFFFDE8E8),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: const Color(0xFFEA5B5B).withOpacity(0.35),
                             ),
-                            borderRadius: BorderRadius.circular(28),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFFEA5B5B).withOpacity(0.45),
-                                blurRadius: 18,
-                                spreadRadius: 1,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                Icons.cancel_rounded,
-                                color: Colors.white,
-                                size: 24,
+                                Icons.close_rounded,
+                                color: Color(0xFFEA5B5B),
+                                size: 20,
                               ),
-                              SizedBox(width: 10),
+                              SizedBox(width: 6),
                               Text(
                                 'Cancel Meetup',
                                 style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.1,
+                                  color: Color(0xFFEA5B5B),
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
