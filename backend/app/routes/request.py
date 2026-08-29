@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request as flask_request, session
 from mysql.connector import Error as MySQLError
 
 from app.models import MeetupRequest
+from app.logging_config import log_handled_exception
 from app.repositories import RequestRepository, UserNotFoundError
 
 request = Blueprint("request", __name__, url_prefix="/request")
@@ -36,6 +37,7 @@ def get_all_nearby_requests():
         latitude = _read_float("latitude", body)
         radius = _read_float("radius", body)
     except ValueError as exc:
+        log_handled_exception("Nearby request validation failed", exc)
         return jsonify(success=False, error=str(exc)), 400
 
     if longitude is None or latitude is None or radius is None:
@@ -53,7 +55,8 @@ def get_all_nearby_requests():
 
     try:
         nearby_requests = request_repository.find_nearby(latitude, longitude, radius)
-    except MySQLError:
+    except MySQLError as exc:
+        log_handled_exception("Nearby request database error", exc)
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(
@@ -76,10 +79,13 @@ def submit_request():
         )
         created_request = request_repository.create(meetup_request)
     except ValueError as exc:
+        log_handled_exception("Submit request validation failed", exc)
         return jsonify(success=False, error=str(exc)), 400
-    except UserNotFoundError:
+    except UserNotFoundError as exc:
+        log_handled_exception("Submit request user not found", exc)
         return jsonify(success=False, error="user not found"), 404
-    except MySQLError:
+    except MySQLError as exc:
+        log_handled_exception("Submit request database error", exc)
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(success=True, data=created_request.to_dict()), 201

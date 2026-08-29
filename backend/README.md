@@ -54,6 +54,13 @@ Authentication uses an HTTP-only signed session cookie. Frontend requests must
 include credentials so the browser stores and sends the cookie. Passwords are
 stored as salted one-way hashes, never as plaintext.
 
+## Exception log
+
+Handled and unexpected exceptions are written to `app.log` in the backend
+directory. Configure its location with `LOG_FILE` in `.env`. Log files are
+excluded from Git and do not include request bodies, passwords, cookies, or
+database credentials.
+
 ## Test
 
 ```bash

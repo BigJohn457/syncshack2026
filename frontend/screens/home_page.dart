@@ -217,8 +217,8 @@ class _HomePageState extends State<HomePage> {
                           final isSelected = _selectedPinId == pin.id;
                           return Marker(
                             point: pin.location,
-                            width: 150,
-                            height: 105,
+                            width: 160,
+                            height: 120,
                             alignment: Alignment.topCenter,
                             child: _MapPinWidget(
                               pinData: pin,
@@ -441,48 +441,53 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 10),
 
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.access_time_rounded,
-                        size: 13,
-                        color: Color(0xFF6C3EE8),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        currentCard['time'],
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.access_time_rounded,
+                          size: 13,
                           color: Color(0xFF6C3EE8),
                         ),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 6.0),
-                        child: Text(
-                          '|',
-                          style: TextStyle(
-                            color: Color(0xFFD4D3E2),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w300,
+                        const SizedBox(width: 4),
+                        Text(
+                          currentCard['time'],
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF6C3EE8),
                           ),
                         ),
-                      ),
-                      const Icon(
-                        Icons.location_on_rounded,
-                        size: 13,
-                        color: Color(0xFF6C3EE8),
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        currentCard['distance'],
-                        style: const TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 5.0),
+                          child: Text(
+                            '|',
+                            style: TextStyle(
+                              color: Color(0xFFD4D3E2),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w300,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.location_on_rounded,
+                          size: 13,
                           color: Color(0xFF6C3EE8),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 3),
+                        Text(
+                          currentCard['distance'],
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF6C3EE8),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

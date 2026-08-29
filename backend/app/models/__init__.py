@@ -1,7 +1,7 @@
 """Domain models used by the application."""
 
 from .auth import AuthenticatedUser, LoginData, SignUpData
-from .message import MeetupMessage, MessageSender
+from .message import MeetupMessage, MessageSender, MessageSubmission
 from .rating import RatingSubmission
 from .request import Location, MeetupRequest
 from .system import SystemMessage, SystemStatus
@@ -14,6 +14,7 @@ __all__ = [
     "MeetupMessage",
     "MeetupRequest",
     "MessageSender",
+    "MessageSubmission",
     "RatingSubmission",
     "SystemMessage",
     "SystemStatus",

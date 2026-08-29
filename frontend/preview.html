@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meetup App - Full 6-Screen App Experience</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+    
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #0b0d14;
+      color: #fff;
+    }
+
+    .phone-container {
+      width: 390px;
+      height: 844px;
+      background: #FAF8F5;
+      border-radius: 48px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 10px #1e202e, 0 0 0 12px #2d3148;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .dynamic-island {
+      width: 110px;
+      height: 28px;
+      background: #000;
+      border-radius: 20px;
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 70;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+    }
+
+    .leaflet-control-attribution, .leaflet-control-zoom { display: none !important; }
+    .custom-pin-marker { background: transparent !important; border: none !important; }
+
+    .screen-view {
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .radar-pulse {
+      animation: radar 2s infinite ease-out;
+    }
+    @keyframes radar {
+      0% { transform: scale(0.4); opacity: 0.9; }
+      70% { transform: scale(2.2); opacity: 0; }
+      100% { transform: scale(2.5); opacity: 0; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-slate-100">
+
+  <!-- Header Info -->
+  <div class="flex items-center justify-between w-full max-w-[390px] mb-3 text-xs text-slate-400">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span id="currentRouteText" class="font-semibold text-slate-200">home ➔ datetime ➔ searching ➔ chat ➔ gp_info ➔ rate</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="toggleScale()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300 font-medium transition">Zoom</button>
+    </div>
+  </div>
+
+  <!-- Phone Mockup Frame -->
+  <div id="phoneFrame" class="phone-container transition-all duration-300 select-none">
+    
+    <!-- Dynamic Island -->
+    <div class="dynamic-island">
+      <div class="w-2.5 h-2.5 bg-[#0f172a] rounded-full border border-slate-700"></div>
+      <div class="w-2 h-2 bg-[#111827] rounded-full"></div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="pt-3.5 px-7 flex justify-between items-center text-[13px] font-semibold text-slate-900 z-50">
+      <span>9:41</span>
+      <div class="flex items-center gap-1.5">
+        <svg class="w-4 h-4 fill-slate-900" viewBox="0 0 24 24"><path d="M2 17h3v4H2v-4zm5-4h3v8H7v-8zm5-4h3v12h-3V9zm5-4h3v16h-3V5z"/></svg>
+        <svg class="w-4 h-4 fill-slate-900" viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0012 4z"/></svg>
+        <div class="w-5 h-2.5 border border-slate-900 rounded-sm p-0.5 flex items-center">
+          <div class="w-full h-full bg-slate-900 rounded-2xs"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SCREEN 1: HOME PAGE                                       -->
+    <!-- ========================================================= -->
+    <div id="homeScreen" class="screen-view absolute inset-0 pt-10 flex flex-col z-10 bg-[#F3F4FD]">
+      <div class="bg-[#EFF1FE] rounded-b-[32px] pt-2 pb-4 px-5 shadow-[0_10px_25px_rgba(108,62,232,0.08)] z-30 relative">
+        <div class="flex items-center justify-between mt-1">
+          <div class="w-[52px] h-[52px] rounded-full bg-[#F3F4FD] border-[3.5px] border-[#7C4DFF]/40 p-[2.5px] shadow-sm flex items-center justify-center">
+            <div class="w-full h-full rounded-full bg-[#6C3EE8] flex items-center justify-center text-white">
+              <svg class="w-7 h-7 fill-white" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+          </div>
+          <div class="w-10 h-10 flex items-center justify-center relative">
+            <svg class="w-7 h-7 text-[#222038]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+            <span class="absolute top-1.5 right-2 w-2.5 h-2.5 bg-[#6C3EE8] rounded-full border-2 border-white"></span>
+          </div>
+        </div>
+
+        <div class="mt-3.5">
+          <div class="flex items-center gap-2">
+            <span class="text-[#6C3EE8] text-lg">✦</span>
+            <h1 class="text-[21px] font-extrabold text-[#1E1B2E]">Your top match</h1>
+          </div>
+          <p class="text-[13px] text-[#5C5B72] mt-0.5">Someone you might want to meet right now ✨</p>
+        </div>
+
+        <div class="mt-3.5 bg-white rounded-[24px] p-4 shadow-sm flex items-center gap-3.5">
+          <div class="w-[62px] h-[62px] rounded-full bg-[#DEDCF7] flex items-center justify-center">
+            <div class="w-[50px] h-[50px] rounded-full bg-[#C7C2F2] flex items-center justify-center">
+              <div class="w-[34px] h-[34px] rounded-full bg-white shadow-sm flex items-center justify-center">
+                <span class="text-lg">☕</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <h2 class="text-[16px] font-extrabold text-[#1E1B2E]">Grab coffee ☕</h2>
+            <p class="text-[11.5px] text-[#6D6B82] truncate">Looking for a coffee buddy nearby!</p>
+            <div class="flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-[#6C3EE8]">
+              <span>15 mins ago</span>
+              <span class="text-[#D4D3E2]">|</span>
+              <span>0.4 km away</span>
+            </div>
+          </div>
+          <button onclick="goToDateTime()" class="h-[36px] px-3.5 rounded-full bg-gradient-to-r from-[#6836E6] to-[#9854FF] text-white text-[13px] font-bold shadow-md">View ›</button>
+        </div>
+      </div>
+
+      <div class="flex-1 relative overflow-hidden">
+        <div id="homeMap" class="absolute inset-0 w-full h-full z-10"></div>
+        <div class="absolute bottom-6 inset-x-0 flex justify-center z-30 pointer-events-auto">
+          <button onclick="goToDateTime()" class="h-[52px] px-7 rounded-full bg-gradient-to-r from-[#5A25E6] to-[#8E45FF] text-white text-[15px] font-bold shadow-[0_8px_25px_rgba(108,62,232,0.5)] flex items-center gap-2.5 hover:brightness-110 active:scale-95 transition">
+            <svg class="w-5 h-5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>New Meetup Request</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SCREEN 2: DATETIME SETUP                                 -->
+    <!-- ========================================================= -->
+    <div id="dateTimeScreen" class="screen-view absolute inset-0 pt-10 flex flex-col z-20 translate-x-full bg-[#FBF7F2]">
+      <div class="px-5 pt-3 flex items-center justify-between">
+        <button onclick="goBackToHome()" class="w-11 h-11 bg-white rounded-full shadow-md flex items-center justify-center text-[#241B3A]">
+          <svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </button>
+        <div class="p-[3px] bg-white rounded-full shadow-sm">
+          <div class="w-14 h-14 rounded-full bg-[#EDE7FA] flex items-center justify-center text-[#7C4DFF]">
+            <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-5 pt-4 pb-6 flex flex-col justify-between">
+        <div>
+          <h1 class="text-[30px] font-extrabold text-[#241B3A] leading-[1.15]">What do you<br>want to do today?</h1>
+          <div class="mt-6 bg-white rounded-[20px] px-3.5 py-2 shadow-sm flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-[#EDE7FA] flex items-center justify-center text-[#7C4DFF]">✨</div>
+            <input id="dtAct" type="text" value="Coffee Meetup ☕" class="w-full text-[14px] font-semibold text-[#241B3A] outline-none" />
+          </div>
+
+          <div class="mt-3 flex gap-3">
+            <div class="flex-1 bg-white rounded-[20px] px-3.5 py-2 shadow-sm flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-full bg-[#EDE7FA] flex items-center justify-center text-[#7C4DFF]">👥</div>
+              <input id="dtPpl" type="number" value="3" class="w-full text-[14px] font-semibold text-[#241B3A] outline-none" />
+            </div>
+            <div class="flex-1 bg-white rounded-[20px] px-3.5 py-2 shadow-sm flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-full bg-[#EDE7FA] flex items-center justify-center text-[#7C4DFF]">📍</div>
+              <input id="dtPlace" type="text" value="Single O / Surry Hills" class="w-full text-[14px] font-semibold text-[#241B3A] outline-none" />
+            </div>
+          </div>
+
+          <div class="mt-4 bg-[#E7DFFB] rounded-[24px] p-4">
+            <div class="flex items-center gap-2.5 mb-3">
+              <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[#7C4DFF]">🕒</div>
+              <h2 class="text-[16px] font-extrabold text-[#241B3A]">Select time</h2>
+            </div>
+            <div class="flex items-center">
+              <div class="w-[64px] h-[64px] rounded-[16px] bg-white border-2 border-[#7C4DFF] flex items-center justify-center text-[26px] font-extrabold text-[#7C4DFF]">03</div>
+              <span class="px-2 text-[28px] font-extrabold text-[#241B3A]">:</span>
+              <div class="w-[64px] h-[64px] rounded-[16px] bg-[#EFEAF8] flex items-center justify-center text-[26px] font-extrabold text-[#241B3A]">30</div>
+              <div class="ml-3 w-12 h-[64px] bg-white rounded-[14px] overflow-hidden flex flex-col">
+                <div class="flex-1 bg-white text-[#241B3A] text-xs font-bold flex items-center justify-center">AM</div>
+                <div class="flex-1 bg-[#7C4DFF] text-white text-xs font-bold flex items-center justify-center">PM</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <button onclick="goToSearching()" class="w-full h-[56px] rounded-[28px] bg-gradient-to-r from-[#7C4DFF] to-[#6C3CE0] text-white text-[16px] font-extrabold shadow-lg flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition">
+            <span>Request Meetup ✨</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SCREEN 3: SEARCHING                                       -->
+    <!-- ========================================================= -->
+    <div id="searchingScreen" class="screen-view absolute inset-0 pt-10 flex flex-col z-30 translate-x-full bg-[#F3F4FD]">
+      <div class="bg-[#EFF1FE] rounded-b-[32px] pt-2 pb-4 px-5 shadow-[0_10px_25px_rgba(108,62,232,0.08)] z-30 relative">
+        <div class="flex items-center justify-between mt-1">
+          <button onclick="cancelSearch()" class="w-10 h-10 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-800">
+            <svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+          </button>
+          <div class="px-3 py-1 bg-[#6C3EE8]/10 rounded-full flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[#6C3EE8] animate-ping"></span>
+            <span class="text-[11px] font-extrabold text-[#6C3EE8] tracking-wider">LIVE SEARCH</span>
+          </div>
+        </div>
+
+        <div class="mt-3.5">
+          <div class="flex items-center gap-2">
+            <span class="text-[#6C3EE8] text-lg">📡</span>
+            <h1 class="text-[21px] font-extrabold text-[#1E1B2E]">Finding your match...</h1>
+          </div>
+          <p class="text-[13px] text-[#5C5B72] mt-0.5">Broadcasting your request to people nearby in Sydney ✨</p>
+        </div>
+
+        <div class="mt-3.5 bg-white rounded-[24px] p-4 shadow-sm flex items-center gap-3.5">
+          <div class="w-[56px] h-[56px] rounded-full bg-[#EDE7FA] flex items-center justify-center text-2xl flex-shrink-0">☕</div>
+          <div class="flex-1 min-w-0">
+            <h2 id="searchCardTitle" class="text-[16px] font-extrabold text-[#1E1B2E]">Coffee Meetup ☕</h2>
+            <p id="searchCardSubtitle" class="text-[12px] text-[#6D6B82] truncate">3 people • Single O / Surry Hills</p>
+            <div class="flex items-center gap-2 mt-1.5 text-[11px] font-bold text-[#6C3EE8]">
+              <span>3:30 PM</span>
+              <span>•</span>
+              <span>Within 2.0 km</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex-1 relative overflow-hidden">
+        <div id="searchMap" class="absolute inset-0 w-full h-full z-10"></div>
+
+        <div class="absolute bottom-6 inset-x-0 px-4 flex gap-3 z-30 pointer-events-auto">
+          <button onclick="cancelSearch()" class="flex-1 h-[52px] rounded-full bg-[#FDE8E8] border border-[#E53935]/40 text-[#E53935] text-[14px] font-bold flex items-center justify-center gap-1.5 hover:bg-red-100 transition">
+            <svg class="w-4.5 h-4.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            <span>Cancel</span>
+          </button>
+          
+          <button onclick="goToChat()" class="flex-[1.5] h-[52px] rounded-full bg-gradient-to-r from-[#5A25E6] to-[#8E45FF] text-white text-[14.5px] font-extrabold shadow-[0_8px_20px_rgba(108,62,232,0.4)] flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition">
+            <svg class="w-5 h-5 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            <span>Search & Chat 💬</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SCREEN 4: CHAT SCREEN                                     -->
+    <!-- ========================================================= -->
+    <div id="chatScreen" class="screen-view absolute inset-0 pt-10 flex flex-col z-40 translate-x-full bg-[#FAF8F5]">
+      <div class="relative px-4 pt-1 pb-2 flex items-center justify-between z-10">
+        <button onclick="goBackToSearching()" class="w-10 h-10 flex items-center justify-center text-[#1E1B2E]">
+          <svg class="w-6 h-6 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </button>
+
+        <div class="flex flex-col items-center">
+          <div class="w-11 h-11 rounded-full bg-[#EDE7FA] flex items-center justify-center text-[#6C3EE8] shadow-sm">
+            <svg class="w-6 h-6 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <h2 class="text-[19px] font-extrabold text-[#1E1B2E] mt-1 leading-tight tracking-tight">Matched!</h2>
+          <p class="text-[11.5px] font-medium text-[#7E7993]">Coffee Meetup • Today 3:30 PM</p>
+        </div>
+
+        <button onclick="goToGpInfo()" class="h-[38px] px-3.5 rounded-full bg-[#6C3EE8] text-white text-[12.5px] font-extrabold shadow-md flex items-center gap-1.5 hover:brightness-110 active:scale-95 transition">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          <span>Group Info</span>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-4 py-2 space-y-4">
+        <!-- Messages -->
+        <div class="flex items-start gap-2.5">
+          <div class="w-11 h-11 rounded-full bg-[#6D3B29]/20 border-2 border-white shadow-sm flex items-center justify-center text-2xl flex-shrink-0">👩🏽</div>
+          <div>
+            <div class="flex items-center gap-1 text-[13px] font-extrabold text-[#241B3A]"><span>Maya</span><span class="text-[#8B64F8] text-xs">✦</span></div>
+            <div class="mt-1 max-w-[240px] bg-[#F3F1F8] p-3.5 rounded-[22px] rounded-tl-xs text-[14px] text-[#1E1B2E] font-medium leading-snug shadow-xs">Hey! Are we still meeting at 3:30?</div>
+            <div class="text-[10.5px] text-[#9E9AB2] mt-1 font-medium">2:45 PM</div>
+          </div>
+        </div>
+
+        <div class="flex items-end justify-end gap-2.5">
+          <div class="flex flex-col items-end">
+            <div class="max-w-[240px] bg-[#6236E7] text-white p-3.5 rounded-[22px] rounded-br-xs text-[14px] font-medium leading-snug shadow-[0_4px_12px_rgba(98,54,231,0.3)]">Yep! I'm about 5 mins away ☕</div>
+            <div class="flex items-center gap-1 text-[10.5px] text-[#9E9AB2] mt-1 font-medium"><span>2:46 PM</span><span class="text-[#6C3EE8] font-bold">✓✓</span></div>
+          </div>
+          <div class="w-11 h-11 rounded-full bg-[#5A3825]/20 border-2 border-white shadow-sm flex items-center justify-center text-2xl flex-shrink-0">👩🏽</div>
+        </div>
+
+        <div class="flex items-start gap-2.5">
+          <div class="w-11 h-11 rounded-full bg-[#E5B869]/25 border-2 border-white shadow-sm flex items-center justify-center text-2xl flex-shrink-0">👱🏼‍♀️</div>
+          <div>
+            <div class="flex items-center gap-1 text-[13px] font-extrabold text-[#241B3A]"><span>Jasmine</span><span class="text-[#8B64F8] text-xs">✦</span></div>
+            <div class="mt-1 max-w-[240px] bg-[#F3F1F8] p-3.5 rounded-[22px] rounded-tl-xs text-[14px] text-[#1E1B2E] font-medium leading-snug shadow-xs">Perfect, see you there!</div>
+            <div class="text-[10.5px] text-[#9E9AB2] mt-1 font-medium">2:47 PM</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 pt-2">
+        <div class="h-14 bg-white rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.06)] px-2.5 flex items-center gap-2.5">
+          <button class="w-9 h-9 rounded-full bg-[#6C3EE8] text-white flex items-center justify-center text-xl font-bold flex-shrink-0">+</button>
+          <input id="chatInput" type="text" placeholder="Message the group..." class="flex-1 text-[14px] text-[#1E1B2E] placeholder-[#A09DB1] font-medium outline-none bg-transparent" />
+          <button onclick="sendMsg()" class="w-9 h-9 rounded-full bg-[#6C3EE8] text-white flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SCREEN 5: GROUP INFO (gp_info.dart)                       -->
+    <!-- ========================================================= -->
+    <div id="gpInfoScreen" class="screen-view absolute inset-0 pt-10 flex flex-col z-50 translate-x-full bg-[#FAF8F5]">
+      <!-- TopBar -->
+      <div class="px-5 pt-2 pb-2 flex items-center justify-between">
+        <button onclick="goBackToChat()" class="w-11 h-11 rounded-full bg-[#5A3825]/20 border-2 border-white shadow-sm flex items-center justify-center text-2xl">
+          👩🏽
+        </button>
+        <div class="flex items-center text-2xl font-black text-[#6C3EE8]">
+          <span>hey!</span>
+          <span class="text-sm -mt-2 ml-0.5">✨</span>
+        </div>
+        <div class="w-11 h-11 bg-[#6C3EE8] rounded-2xl flex items-center justify-center text-white shadow-md">
+          <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        </div>
+      </div>
+
+      <!-- Title & Pill -->
+      <div class="text-center mt-2">
+        <h1 class="text-[28px] font-black text-[#241B3A] tracking-wide">GROUP INFO</h1>
+        <p class="text-[13px] font-medium text-[#7E7993] mt-0.5">Coffee Meetup • Today at 3:30 PM</p>
+        <div class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-[#EDE7FA] rounded-full text-[#6C3EE8] text-xs font-bold mt-2.5">
+          <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          <span>2 attending • 2 pending</span>
+        </div>
+      </div>
+
+      <!-- Participant Cards -->
+      <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3.5">
+        <!-- Maya -->
+        <div class="h-20 bg-[#EFF9F3] border border-[#D8F2E2] rounded-[26px] px-4 flex items-center justify-between shadow-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-13 h-13 rounded-full bg-[#6D3B29]/20 border-2 border-white shadow-xs flex items-center justify-center text-2xl">👩🏽</div>
+            <div class="flex items-center gap-1">
+              <span class="text-lg font-black text-[#241B3A]">Maya</span>
+              <span class="text-[#8B64F8] text-xs font-bold">✦ ✦</span>
+            </div>
+          </div>
+          <div class="px-3.5 py-2 bg-white rounded-2xl shadow-xs text-[#2EAF6C] text-xs font-black tracking-wider">ATTENDING!</div>
+        </div>
+
+        <!-- Jasmine -->
+        <div class="h-20 bg-[#EFF9F3] border border-[#D8F2E2] rounded-[26px] px-4 flex items-center justify-between shadow-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-13 h-13 rounded-full bg-[#E5B869]/20 border-2 border-white shadow-xs flex items-center justify-center text-2xl">👱🏼‍♀️</div>
+            <div class="flex items-center gap-1">
+              <span class="text-lg font-black text-[#241B3A]">Jasmine</span>
+              <span class="text-[#8B64F8] text-xs font-bold">✦ ✦</span>
+            </div>
+          </div>
+          <div class="px-3.5 py-2 bg-white rounded-2xl shadow-xs text-[#2EAF6C] text-xs font-black tracking-wider">ATTENDING!</div>
+        </div>
+
+        <!-- Sophie -->
+        <div class="h-20 bg-[#FEF8E7] border border-[#FCEEC8] rounded-[26px] px-4 flex items-center justify-between shadow-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-13 h-13 rounded-full bg-[#8B5E3C]/20 border-2 border-white shadow-xs flex items-center justify-center text-2xl">👩🏼</div>
+            <div class="flex items-center gap-1">
+              <span class="text-lg font-black text-[#241B3A]">Sophie</span>
+              <span class="text-[#E5A117] text-xs font-bold">✦ ✦</span>
+            </div>
+          </div>
+          <div class="px-3.5 py-2 bg-white rounded-2xl shadow-xs text-[#E5A117] text-xs font-black tracking-wider">PENDING...</div>
+        </div>
+
+        <!-- Ethan -->
+        <div class="h-20 bg-[#FEF8E7] border border-[#FCEEC8] rounded-[26px] px-4 flex items-center justify-between shadow-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-13 h-13 rounded-full bg-[#355C3E]/20 border-2 border-white shadow-xs flex items-center justify-center text-2xl">👦🏽</div>
+            <div class="flex items-center gap-1">
+              <span class="text-lg font-black text-[#241B3A]">Ethan</span>
+              <span class="text-[#E5A117] text-xs font-bold">✦ ✦</span>
+            </div>
+          </div>
+          <div class="px-3.5 py-2 bg-white rounded-2xl shadow-xs text-[#E5A117] text-xs font-black tracking-wider">PENDING...</div>
+        </div>
+      </div>
+
+      <!-- Action Buttons: Green Finished Button + Red Leave Button -->
+      <div class="p-5 pt-2 space-y-2.5">
+        <!-- 🟢 Green Finished Button -> Goes to rate.dart -->
+        <button onclick="goToRate()" class="w-full h-13 rounded-full bg-gradient-to-r from-[#27AE60] to-[#2ECC71] text-white text-[15px] font-extrabold shadow-[0_6px_20px_rgba(39,174,96,0.35)] flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition">
+          <svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          <span>Finished</span>
+        </button>
+
+        <!-- 🔴 Red Leave Meetup Button -> Returns to home_page.dart -->
+        <button onclick="leaveMeetupToHome()" class="w-full h-11 rounded-full bg-[#FDE8E8] border border-[#EA5B5B]/30 text-[#EA5B5B] text-sm font-bold flex items-center justify-center gap-1.5 hover:bg-red-100 transition">
+          <svg class="w-4.5 h-4.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          <span>Leave Meetup</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SCREEN 6: RATING SCREEN (rate.dart - WORKING STARS)       -->
+    <!-- ========================================================= -->
+    <div id="rateScreen" class="screen-view absolute inset-0 pt-10 flex flex-col z-60 translate-x-full bg-[#FAF8F5]">
+      <!-- TopBar -->
+      <div class="px-5 pt-2 pb-2 flex items-center justify-between">
+        <button onclick="goBackToGpInfo()" class="w-11 h-11 rounded-full bg-white shadow-md flex items-center justify-center text-[#241B3A]">
+          <svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        </button>
+        <div class="w-12 h-12 rounded-full bg-[#5A3825]/20 border-2 border-white shadow-md flex items-center justify-center text-2xl">
+          👩🏽
+        </div>
+      </div>
+
+      <!-- Title & Subtitle -->
+      <div class="text-center mt-3">
+        <h1 class="text-[32px] font-black text-[#241B3A] tracking-tight">Rate the Meetup!</h1>
+        <p class="text-[14.5px] font-medium text-[#7E7993] mt-1">How was your coffee meetup?</p>
+      </div>
+
+      <!-- Rating Cards with Working Interactive Stars -->
+      <div class="flex-1 overflow-y-auto px-5 py-6 space-y-4">
+        
+        <!-- 1. John -->
+        <div class="h-21 bg-white rounded-[26px] px-5 shadow-[0_4px_16px_rgba(0,0,0,0.04)] flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <input type="checkbox" checked class="w-5 h-5 rounded-md accent-[#6C3EE8] cursor-pointer" />
+            <span class="text-[22px] font-black text-[#241B3A]">John</span>
+          </div>
+          <div class="flex items-center gap-2" id="starsJohn">
+            <button onclick="setRate('John', 1)" class="w-9 h-9 rounded-full bg-[#6C3EE8] text-white flex items-center justify-center text-base shadow-sm">★</button>
+            <button onclick="setRate('John', 2)" class="w-9 h-9 rounded-full bg-[#F6F3FD] text-[#241B3A] border border-[#7C4DFF]/30 flex items-center justify-center text-base">☆</button>
+            <button onclick="setRate('John', 3)" class="w-9 h-9 rounded-full bg-[#F6F3FD] text-[#241B3A] border border-[#7C4DFF]/30 flex items-center justify-center text-base">☆</button>
+          </div>
+        </div>
+
+        <!-- 2. Maya -->
+        <div class="h-21 bg-white rounded-[26px] px-5 shadow-[0_4px_16px_rgba(0,0,0,0.04)] flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <input type="checkbox" checked class="w-5 h-5 rounded-md accent-[#6C3EE8] cursor-pointer" />
+            <span class="text-[22px] font-black text-[#241B3A]">Maya</span>
+          </div>
+          <div class="flex items-center gap-2" id="starsMaya">
+            <button onclick="setRate('Maya', 1)" class="w-9 h-9 rounded-full bg-[#6C3EE8] text-white flex items-center justify-center text-base shadow-sm">★</button>
+            <button onclick="setRate('Maya', 2)" class="w-9 h-9 rounded-full bg-[#6C3EE8] text-white flex items-center justify-center text-base shadow-sm">★</button>
+            <button onclick="setRate('Maya', 3)" class="w-9 h-9 rounded-full bg-[#F6F3FD] text-[#241B3A] border border-[#7C4DFF]/30 flex items-center justify-center text-base">☆</button>
+          </div>
+        </div>
+
+        <!-- 3. Ethan -->
+        <div class="h-21 bg-white rounded-[26px] px-5 shadow-[0_4px_16px_rgba(0,0,0,0.04)] flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <input type="checkbox" class="w-5 h-5 rounded-md accent-[#6C3EE8] cursor-pointer" />
+            <span class="text-[22px] font-black text-[#241B3A]">Ethan</span>
+          </div>
+          <div class="flex items-center gap-2" id="starsEthan">
+            <button onclick="setRate('Ethan', 1)" class="w-9 h-9 rounded-full bg-[#F6F3FD] text-[#241B3A] border border-[#7C4DFF]/30 flex items-center justify-center text-base">☆</button>
+            <button onclick="setRate('Ethan', 2)" class="w-9 h-9 rounded-full bg-[#F6F3FD] text-[#241B3A] border border-[#7C4DFF]/30 flex items-center justify-center text-base">☆</button>
+            <button onclick="setRate('Ethan', 3)" class="w-9 h-9 rounded-full bg-[#F6F3FD] text-[#241B3A] border border-[#7C4DFF]/30 flex items-center justify-center text-base">☆</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Submit Ratings Button -->
+      <div class="p-6 pt-2">
+        <button onclick="submitRatings()" class="w-full h-14 rounded-full bg-gradient-to-r from-[#6C3EE8] to-[#8E45FF] text-white text-[16px] font-extrabold shadow-[0_8px_25px_rgba(108,62,232,0.4)] flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition">
+          <svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          <span>Submit Ratings ✨</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Home Indicator -->
+    <div class="w-32 h-1 bg-slate-900/40 rounded-full mx-auto mb-2 z-50"></div>
+
+  </div>
+
+  <script>
+    const sydneyCenter = [-33.8688, 151.2093];
+    let homeMapInstance, searchMapInstance;
+
+    const ratings = {
+      John: 1,
+      Maya: 2,
+      Ethan: 0
+    };
+
+    function setRate(name, score) {
+      if (ratings[name] === score) {
+        ratings[name] = 0;
+      } else {
+        ratings[name] = score;
+      }
+      renderStars(name);
+    }
+
+    function renderStars(name) {
+      const container = document.getElementById(`stars${name}`);
+      const curScore = ratings[name];
+      let html = '';
+      for (let i = 1; i <= 3; i++) {
+        if (i <= curScore) {
+          html += `<button onclick="setRate('${name}', ${i})" class="w-9 h-9 rounded-full bg-[#6C3EE8] text-white flex items-center justify-center text-base shadow-sm">★</button>`;
+        } else {
+          html += `<button onclick="setRate('${name}', ${i})" class="w-9 h-9 rounded-full bg-[#F6F3FD] text-[#241B3A] border border-[#7C4DFF]/30 flex items-center justify-center text-base">☆</button>`;
+        }
+      }
+      container.innerHTML = html;
+    }
+
+    const pins = [
+      { coords: [-33.8610, 151.2105], text: "Wants to grab<br>coffee! ☕", time: "15 mins ago" },
+      { coords: [-33.8645, 151.2175], text: "Down for<br>a walk 🚶", time: "8 mins ago" },
+      { coords: [-33.8825, 151.2135], text: "Brunch<br>anyone? 🥐", time: "22 mins ago" },
+      { coords: [-33.8745, 151.2005], text: "Open to<br>any plans! 🎉", time: "12 mins ago" },
+      { coords: [-33.8550, 151.2100], text: "Let's explore<br>the city! 🌉", time: "5 mins ago" }
+    ];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      homeMapInstance = L.map('homeMap', { center: sydneyCenter, zoom: 14, zoomControl: false });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(homeMapInstance);
+
+      pins.forEach(pin => {
+        const pinHtml = `
+          <div style="transform: translate(-50%, -100%); cursor: pointer;">
+            <div style="background: white; border-radius: 14px; padding: 6px 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); text-align: left; font-family: inherit;">
+              <div style="font-size: 11px; font-weight: 800; color: #1E1B2E; line-height: 1.2;">${pin.text}</div>
+              <div style="font-size: 9.5px; font-weight: 700; color: #6C3EE8; margin-top: 3px;">${pin.time}</div>
+            </div>
+            <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid white; margin: 0 auto;"></div>
+            <div style="width: 10px; height: 10px; background: #6C3EE8; border: 2px solid white; border-radius: 50%; margin: 1px auto 0 auto; box-shadow: 0 0 0 3px rgba(108,62,232,0.35);"></div>
+          </div>`;
+        L.marker(pin.coords, { icon: L.divIcon({ html: pinHtml, className: 'custom-pin-marker', iconSize: [0, 0] }) }).addTo(homeMapInstance);
+      });
+    });
+
+    function goToDateTime() {
+      document.getElementById('dateTimeScreen').classList.remove('translate-x-full');
+      document.getElementById('dateTimeScreen').classList.add('translate-x-0');
+      document.getElementById('currentRouteText').innerText = 'home_page ➔ datetime.dart';
+    }
+
+    function goBackToHome() {
+      document.getElementById('dateTimeScreen').classList.remove('translate-x-0');
+      document.getElementById('dateTimeScreen').classList.add('translate-x-full');
+      document.getElementById('searchingScreen').classList.remove('translate-x-0');
+      document.getElementById('searchingScreen').classList.add('translate-x-full');
+      document.getElementById('chatScreen').classList.remove('translate-x-0');
+      document.getElementById('chatScreen').classList.add('translate-x-full');
+      document.getElementById('gpInfoScreen').classList.remove('translate-x-0');
+      document.getElementById('gpInfoScreen').classList.add('translate-x-full');
+      document.getElementById('rateScreen').classList.remove('translate-x-0');
+      document.getElementById('rateScreen').classList.add('translate-x-full');
+      document.getElementById('currentRouteText').innerText = 'home_page.dart (Sydney Map)';
+    }
+
+    function goToSearching() {
+      const act = document.getElementById('dtAct').value || 'Coffee Meetup ☕';
+      const ppl = document.getElementById('dtPpl').value || '3';
+      const place = document.getElementById('dtPlace').value || 'Single O / Surry Hills';
+
+      document.getElementById('searchCardTitle').innerText = act;
+      document.getElementById('searchCardSubtitle').innerText = `${ppl} people • ${place}`;
+
+      document.getElementById('searchingScreen').classList.remove('translate-x-full');
+      document.getElementById('searchingScreen').classList.add('translate-x-0');
+      document.getElementById('currentRouteText').innerText = 'searching.dart (Live Radar)';
+
+      setTimeout(() => {
+        if (!searchMapInstance) {
+          searchMapInstance = L.map('searchMap', { center: sydneyCenter, zoom: 14.5, zoomControl: false });
+          L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(searchMapInstance);
+
+          const radarHtml = `
+            <div style="position: relative; width: 60px; height: 60px; transform: translate(-50%, -50%);">
+              <div class="radar-pulse" style="position: absolute; inset: 0; background: rgba(108,62,232,0.4); border-radius: 50%;"></div>
+              <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 18px; height: 18px; background: #6C3EE8; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 10px rgba(108,62,232,0.6);"></div>
+            </div>`;
+          L.marker(sydneyCenter, { icon: L.divIcon({ html: radarHtml, className: 'custom-pin-marker', iconSize: [0, 0] }) }).addTo(searchMapInstance);
+        } else {
+          searchMapInstance.invalidateSize();
+        }
+      }, 300);
+    }
+
+    function goToChat() {
+      document.getElementById('chatScreen').classList.remove('translate-x-full');
+      document.getElementById('chatScreen').classList.add('translate-x-0');
+      document.getElementById('currentRouteText').innerText = 'chat.dart (Matched! Group Chat)';
+    }
+
+    function goBackToSearching() {
+      document.getElementById('chatScreen').classList.remove('translate-x-0');
+      document.getElementById('chatScreen').classList.add('translate-x-full');
+      document.getElementById('currentRouteText').innerText = 'searching.dart (Live Radar)';
+    }
+
+    function goToGpInfo() {
+      document.getElementById('gpInfoScreen').classList.remove('translate-x-full');
+      document.getElementById('gpInfoScreen').classList.add('translate-x-0');
+      document.getElementById('currentRouteText').innerText = 'gp_info.dart (Group Info)';
+    }
+
+    function goBackToChat() {
+      document.getElementById('gpInfoScreen').classList.remove('translate-x-0');
+      document.getElementById('gpInfoScreen').classList.add('translate-x-full');
+      document.getElementById('currentRouteText').innerText = 'chat.dart (Matched! Group Chat)';
+    }
+
+    function goToRate() {
+      document.getElementById('rateScreen').classList.remove('translate-x-full');
+      document.getElementById('rateScreen').classList.add('translate-x-0');
+      document.getElementById('currentRouteText').innerText = 'rate.dart (Rate the Meetup!)';
+    }
+
+    function goBackToGpInfo() {
+      document.getElementById('rateScreen').classList.remove('translate-x-0');
+      document.getElementById('rateScreen').classList.add('translate-x-full');
+      document.getElementById('currentRouteText').innerText = 'gp_info.dart (Group Info)';
+    }
+
+    function submitRatings() {
+      alert('✨ Ratings submitted! Thanks for being part of the community.');
+      goBackToHome();
+    }
+
+    function leaveMeetupToHome() {
+      alert('🚪 You left the meetup. Returning to Home Map!');
+      goBackToHome();
+    }
+
+    function cancelSearch() {
+      alert('🚫 Meetup request cancelled. Returning to Home Map!');
+      goBackToHome();
+    }
+
+    let isScaled = false;
+    function toggleScale() {
+      const frame = document.getElementById('phoneFrame');
+      isScaled = !isScaled;
+      frame.style.transform = isScaled ? 'scale(1.15)' : 'scale(1)';
+    }
+  </script>
+</body>
+</html>

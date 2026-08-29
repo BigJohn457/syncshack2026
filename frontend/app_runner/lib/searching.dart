@@ -573,7 +573,8 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
                   SnackBar(
                     content: const Row(
                       children: [
-                        Icon(Icons.cancel_outlined, color: Colors.white, size: 19),
+                        Icon(Icons.cancel_outlined,
+                            color: Colors.white, size: 19),
                         SizedBox(width: 8),
                         Text('Meetup request cancelled.'),
                       ],
@@ -754,6 +755,13 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
                 child: ElevatedButton(
                   onPressed: () {
                     Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Matched with ${pin.author}! 🎉'),
+                        backgroundColor: const Color(0xFF6C3EE8),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
                     Navigator.push(
                       context,
                       MaterialPageRoute(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
+import 'chat.dart';
 
 class SearchingPage extends StatefulWidget {
   final String activity;
@@ -258,16 +259,14 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
                   child: _buildGpsButton(),
                 ),
 
-                // Bottom Red Cancel Button: "Cancel Request"
+                // Bottom Action Buttons: Red "Cancel" + Purple "Search & Chat"
                 Positioned(
                   left: 0,
                   right: 0,
                   bottom: mediaQuery.padding.bottom > 0
                       ? mediaQuery.padding.bottom + 12
                       : 28,
-                  child: Center(
-                    child: _buildCancelButton(),
-                  ),
+                  child: _buildBottomActionButtons(),
                 ),
               ],
             ),
@@ -555,73 +554,140 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
   }
 
   // -------------------------------------------------------------
-  // BOTTOM RED CANCEL BUTTON: "Cancel Request"
+  // BOTTOM ACTION BUTTONS: Red "Cancel" + Purple "Search & Chat"
   // -------------------------------------------------------------
-  Widget _buildCancelButton() {
-    return GestureDetector(
-      onTap: () {
-        // Pop back to the HomePage
-        Navigator.of(context).popUntil((route) => route.isFirst);
+  Widget _buildBottomActionButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Row(
+        children: [
+          // 🔴 Red Cancel Button
+          Expanded(
+            flex: 2,
+            child: GestureDetector(
+              onTap: () {
+                // Pop back to the HomePage
+                Navigator.of(context).popUntil((route) => route.isFirst);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.cancel_outlined, color: Colors.white, size: 19),
-                SizedBox(width: 8),
-                Text('Meetup request cancelled.'),
-              ],
-            ),
-            backgroundColor: const Color(0xFFE53935),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      },
-      child: Container(
-        height: 52,
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFFE53935),
-              Color(0xFFFF5252),
-            ],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFE53935).withOpacity(0.45),
-              blurRadius: 18,
-              spreadRadius: 1,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.close_rounded,
-              color: Colors.white,
-              size: 21,
-            ),
-            SizedBox(width: 9),
-            Text(
-              'Cancel Request',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.1,
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Row(
+                      children: [
+                        Icon(Icons.cancel_outlined,
+                            color: Colors.white, size: 19),
+                        SizedBox(width: 8),
+                        Text('Meetup request cancelled.'),
+                      ],
+                    ),
+                    backgroundColor: const Color(0xFFE53935),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE8E8),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: const Color(0xFFE53935).withOpacity(0.35),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE53935).withOpacity(0.12),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFFE53935),
+                      size: 20,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      'Cancel',
+                      style: TextStyle(
+                        color: Color(0xFFE53935),
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+
+          // 💜 Purple Search / Chat Button -> Goes to chat.dart
+          Expanded(
+            flex: 3,
+            child: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatPage(
+                      matchName: 'Elena Rivera',
+                      activity: widget.activity,
+                      place: widget.place,
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF5A25E6),
+                      Color(0xFF8E45FF),
+                    ],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF6C3EE8).withOpacity(0.45),
+                      blurRadius: 16,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      color: Colors.white,
+                      size: 19,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Search & Chat 💬',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -696,13 +762,23 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatPage(
+                          matchName: pin.author,
+                          activity: widget.activity,
+                          place: widget.place,
+                        ),
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6C3EE8),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                   ),
-                  child: const Text('Connect & Meetup 👋', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+                  child: const Text('Connect & Open Chat 💬', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
                 ),
               ),
             ],

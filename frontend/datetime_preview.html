@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DateTimeSetupPage - Live HTML Preview</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #0b0d14;
+      color: #fff;
+    }
+
+    /* Phone Shell Styling */
+    .phone-container {
+      width: 390px;
+      height: 844px;
+      background: #FBF7F2;
+      border-radius: 48px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 0 10px #1e202e, 0 0 0 12px #2d3148;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Dynamic Island */
+    .dynamic-island {
+      width: 110px;
+      height: 28px;
+      background: #000;
+      border-radius: 20px;
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 60;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+    }
+
+    /* Toast Notification */
+    #toast {
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-slate-100">
+
+  <!-- Header Info -->
+  <div class="flex items-center justify-between w-full max-w-[390px] mb-3 text-xs text-slate-400">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse"></span>
+      <span class="font-semibold text-slate-200">datetime.dart (DateTimeSetupPage)</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="toggleScale()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-md text-slate-300 font-medium transition">Zoom</button>
+    </div>
+  </div>
+
+  <!-- Phone Mockup Frame -->
+  <div id="phoneFrame" class="phone-container transition-all duration-300 select-none">
+    
+    <!-- Dynamic Island -->
+    <div class="dynamic-island">
+      <div class="w-2.5 h-2.5 bg-[#0f172a] rounded-full border border-slate-700"></div>
+      <div class="w-2 h-2 bg-[#111827] rounded-full"></div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="pt-3.5 px-7 flex justify-between items-center text-[13px] font-semibold text-[#241B3A] z-40">
+      <span>9:41</span>
+      <div class="flex items-center gap-1.5">
+        <svg class="w-4 h-4 fill-[#241B3A]" viewBox="0 0 24 24"><path d="M2 17h3v4H2v-4zm5-4h3v8H7v-8zm5-4h3v12h-3V9zm5-4h3v16h-3V5z"/></svg>
+        <svg class="w-4 h-4 fill-[#241B3A]" viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0012 4z"/></svg>
+        <div class="w-5 h-2.5 border border-[#241B3A] rounded-sm p-0.5 flex items-center">
+          <div class="w-full h-full bg-[#241B3A] rounded-2xs"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Decorative Background Sparkles -->
+    <div class="absolute top-[80px] right-[120px] text-[#7C4DFF]/50 text-xl pointer-events-none">✦</div>
+    <div class="absolute top-[115px] right-[96px] text-[#7C4DFF]/35 text-xs pointer-events-none">✦</div>
+
+    <!-- Main Screen Content (SafeArea) -->
+    <div class="flex-1 overflow-y-auto px-5 pt-3 pb-6 flex flex-col justify-between">
+      
+      <div>
+        <!-- TopBar: Back Arrow & User Avatar -->
+        <div class="flex items-center justify-between">
+          <button onclick="showToast('Navigating back to Home Map 📍')" class="w-11 h-11 bg-white rounded-full shadow-[0_4px_12px_rgba(108,60,224,0.12)] flex items-center justify-center text-[#241B3A] hover:bg-slate-50 active:scale-95 transition">
+            <svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+          </button>
+
+          <div class="p-[3px] bg-white rounded-full shadow-sm">
+            <div class="w-14 h-14 rounded-full bg-[#EDE7FA] flex items-center justify-center text-[#7C4DFF]">
+              <svg class="w-7 h-7 fill-current" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Headline -->
+        <div class="mt-7">
+          <h1 class="text-[32px] font-extrabold text-[#241B3A] leading-[1.15] tracking-tight">
+            What do you<br>want to do today?
+          </h1>
+        </div>
+
+        <!-- Activity Field Pill -->
+        <div class="mt-7 bg-white rounded-[20px] px-3.5 py-1.5 shadow-[0_4px_12px_rgba(108,60,224,0.06)] flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-[#EDE7FA] flex items-center justify-center text-[#7C4DFF] flex-shrink-0">
+            <svg class="w-4.5 h-4.5 fill-current" viewBox="0 0 24 24"><path d="M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29c-.39-.39-1.02-.39-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z"/></svg>
+          </div>
+          <input id="activityInput" type="text" placeholder="Activity" value="Grab Coffee & Code ☕" class="w-full bg-transparent text-[15px] font-semibold text-[#241B3A] placeholder-[#241B3A]/35 outline-none" />
+        </div>
+
+        <!-- People & Place Row -->
+        <div class="mt-3.5 flex gap-3.5">
+          <!-- Number of People -->
+          <div class="flex-1 bg-white rounded-[20px] px-3.5 py-1.5 shadow-[0_4px_12px_rgba(108,60,224,0.06)] flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-full bg-[#EDE7FA] flex items-center justify-center text-[#7C4DFF] flex-shrink-0">
+              <svg class="w-4.5 h-4.5 fill-current" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+            </div>
+            <input id="peopleInput" type="number" placeholder="People" value="2" class="w-full bg-transparent text-[15px] font-semibold text-[#241B3A] placeholder-[#241B3A]/35 outline-none" />
+          </div>
+
+          <!-- Place -->
+          <div class="flex-1 bg-white rounded-[20px] px-3.5 py-1.5 shadow-[0_4px_12px_rgba(108,60,224,0.06)] flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-full bg-[#EDE7FA] flex items-center justify-center text-[#7C4DFF] flex-shrink-0">
+              <svg class="w-4.5 h-4.5 fill-current" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            </div>
+            <input id="placeInput" type="text" placeholder="Place" value="Blue Bottle" class="w-full bg-transparent text-[15px] font-semibold text-[#241B3A] placeholder-[#241B3A]/35 outline-none" />
+          </div>
+        </div>
+
+        <!-- Select Time Card -->
+        <div class="mt-5 bg-[#E7DFFB] rounded-[28px] p-5 pb-3.5">
+          <!-- Card Header -->
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-white flex items-center justify-center text-[#7C4DFF]">
+              <svg class="w-4.5 h-4.5 fill-current" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            </div>
+            <h2 class="text-[18px] font-extrabold text-[#241B3A]">Select time</h2>
+          </div>
+
+          <!-- Time Selector Row -->
+          <div class="mt-5 flex items-center">
+            
+            <!-- Hour Box (Tap to cycle) -->
+            <div onclick="cycleHour()" class="w-[72px] h-[72px] rounded-[18px] bg-white border-2 border-[#7C4DFF] flex items-center justify-center text-[30px] font-extrabold text-[#7C4DFF] cursor-pointer active:scale-95 transition shadow-sm">
+              <span id="hourVal">08</span>
+            </div>
+
+            <!-- Colon -->
+            <span class="px-2.5 text-[32px] font-extrabold text-[#241B3A]">:</span>
+
+            <!-- Minute Box (Tap to cycle) -->
+            <div onclick="cycleMinute()" class="w-[72px] h-[72px] rounded-[18px] bg-[#EFEAF8] flex items-center justify-center text-[30px] font-extrabold text-[#241B3A] cursor-pointer active:scale-95 transition">
+              <span id="minuteVal">30</span>
+            </div>
+
+            <!-- AM / PM Toggle -->
+            <div class="ml-3.5 w-14 h-[72px] bg-white rounded-[16px] overflow-hidden flex flex-col shadow-sm">
+              <button onclick="setAm(true)" id="amBtn" class="flex-1 w-full bg-[#7C4DFF] text-white text-[14px] font-extrabold flex items-center justify-center transition">AM</button>
+              <button onclick="setAm(false)" id="pmBtn" class="flex-1 w-full bg-white text-[#241B3A] text-[14px] font-extrabold flex items-center justify-center transition">PM</button>
+            </div>
+          </div>
+
+          <!-- Labels Row -->
+          <div class="flex gap-6 mt-1 text-[12px] text-[#241B3A] font-medium">
+            <span class="w-[72px] text-center">Hour</span>
+            <span class="w-[72px] text-center ml-2">Minute</span>
+          </div>
+
+          <!-- Card Actions (Cancel / OK) -->
+          <div class="mt-3 flex justify-end items-center gap-2">
+            <button onclick="resetTime()" class="px-3 py-1.5 text-[15px] font-bold text-[#6C3CE0]/60 hover:text-[#6C3CE0] transition">Cancel</button>
+            <button onclick="showToast('Time set to ' + getFormattedTime())" class="px-3 py-1.5 text-[15px] font-extrabold text-[#6C3CE0] hover:brightness-125 transition">OK</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Bottom Button: Request Meetup -->
+      <div class="mt-7">
+        <button onclick="submitMeetup()" class="w-full h-[60px] rounded-[30px] bg-gradient-to-r from-[#7C4DFF] to-[#6C3CE0] text-white text-[17px] font-extrabold shadow-[0_10px_25px_rgba(124,77,255,0.45)] flex items-center justify-center gap-3 hover:brightness-110 active:scale-95 transition">
+          <div class="w-[30px] h-[30px] rounded-full bg-white/20 flex items-center justify-center">
+            <svg class="w-4 h-4 fill-white" viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          </div>
+          <span>Request Meetup</span>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="absolute bottom-24 inset-x-6 bg-slate-900/95 backdrop-blur-md text-white text-xs font-medium py-3 px-4 rounded-xl shadow-2xl border border-slate-700/50 flex items-center justify-between opacity-0 translate-y-4 pointer-events-none z-50">
+      <span id="toastMsg">Notification message</span>
+      <span class="text-[#9F75FF] font-bold text-[10px]">TAP</span>
+    </div>
+
+    <!-- Home Indicator -->
+    <div class="w-32 h-1 bg-slate-900/40 rounded-full mx-auto mb-2 z-40"></div>
+
+  </div>
+
+  <script>
+    let hour = 8;
+    let minute = 30;
+    let isAm = true;
+
+    function cycleHour() {
+      hour = hour === 12 ? 1 : hour + 1;
+      document.getElementById('hourVal').innerText = hour.toString().padStart(2, '0');
+    }
+
+    function cycleMinute() {
+      minute = (minute + 5) % 60;
+      document.getElementById('minuteVal').innerText = minute.toString().padStart(2, '0');
+    }
+
+    function setAm(value) {
+      isAm = value;
+      const amBtn = document.getElementById('amBtn');
+      const pmBtn = document.getElementById('pmBtn');
+      if (isAm) {
+        amBtn.className = "flex-1 w-full bg-[#7C4DFF] text-white text-[14px] font-extrabold flex items-center justify-center transition";
+        pmBtn.className = "flex-1 w-full bg-white text-[#241B3A] text-[14px] font-extrabold flex items-center justify-center transition";
+      } else {
+        amBtn.className = "flex-1 w-full bg-white text-[#241B3A] text-[14px] font-extrabold flex items-center justify-center transition";
+        pmBtn.className = "flex-1 w-full bg-[#7C4DFF] text-white text-[14px] font-extrabold flex items-center justify-center transition";
+      }
+    }
+
+    function resetTime() {
+      hour = 8;
+      minute = 30;
+      isAm = true;
+      document.getElementById('hourVal').innerText = '08';
+      document.getElementById('minuteVal').innerText = '30';
+      setAm(true);
+      showToast('Reset time to 08:30 AM');
+    }
+
+    function getFormattedTime() {
+      return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')} ${isAm ? 'AM' : 'PM'}`;
+    }
+
+    function submitMeetup() {
+      const act = document.getElementById('activityInput').value || 'Activity';
+      const ppl = document.getElementById('peopleInput').value || '2';
+      const place = document.getElementById('placeInput').value || 'Nearby';
+      showToast(`Meetup requested: ${act} (${ppl} people) at ${place} for ${getFormattedTime()}! 🚀`);
+    }
+
+    let isScaled = false;
+    function toggleScale() {
+      const frame = document.getElementById('phoneFrame');
+      isScaled = !isScaled;
+      frame.style.transform = isScaled ? 'scale(1.15)' : 'scale(1)';
+    }
+
+    let toastTimer;
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.innerText = message;
+      toast.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+        toast.classList.remove('opacity-100', 'translate-y-0');
+      }, 2500);
+    }
+  </script>
+</body>
+</html>

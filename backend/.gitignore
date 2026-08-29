@@ -6,5 +6,7 @@ venv/
 .pytest_cache/
 .coverage
 htmlcov/
+*.log
+*.log.*
 instance/
 .DS_Store
