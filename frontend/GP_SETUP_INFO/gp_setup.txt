@@ -1,0 +1,43 @@
+Create an original mobile app UI mockup for a spontaneous meetup app called “hey!”, showing the Event Setup / Request Meetup screen.
+
+Use the attached meetup-map screen only as general visual inspiration for the mood and design system. Do not copy it exactly. Create a new, distinct layout that feels like it belongs to the same app.
+
+Keep the visual style:
+
+vivid purple as the main brand color
+soft off-white / light cream background
+subtle lavender gradients
+large rounded cards and input fields
+soft shadows
+clean, youthful typography
+friendly, playful social-app feeling
+polished modern iOS-style mobile interface
+
+Design a portrait smartphone screen with:
+
+a simple back arrow in the upper-left
+a circular user avatar in the upper-right
+a large heading: “What do you want to do today?”
+a full-width rounded field labeled “Activity”
+two smaller rounded fields underneath, side by side:
+“Number of people”
+“Place”
+
+Below the fields, create a large rounded soft-lavender time-selection card.
+
+Inside the time card show:
+
+small text: “Select time”
+large hour value
+colon
+large minute value
+compact AM / PM selector
+“Cancel” and “OK” text controls
+
+At the bottom, add a large rounded vivid-purple button labeled “Request Meetup”.
+
+Make the composition spacious and visually balanced. Use small decorative purple sparkles or subtle accent shapes where appropriate so it feels connected to the playful map screen.
+
+This is a static UI concept only. Do not depict functional navigation, real maps, backend behavior, or working form controls.
+
+The result should look like a professional high-fidelity app design presentation, while remaining an original interface rather than a reproduction of the reference image.

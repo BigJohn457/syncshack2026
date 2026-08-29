@@ -1,0 +1,56 @@
+Create an original mobile app UI mockup for a spontaneous meetup app called “hey!”, showing the Group Info / Attendance screen.
+
+Use the attached meetup-map screen only as general visual inspiration for the app’s overall mood and design system. Do not copy the reference exactly. Create a new layout that clearly feels like part of the same app.
+
+Keep the visual style consistent with the rest of “hey!”:
+
+vivid purple as the primary brand color
+soft off-white / light cream background
+subtle lavender gradients
+large rounded cards
+soft shadows
+clean, youthful typography
+friendly social-app feeling
+polished modern mobile UI
+playful small purple accent shapes or sparkles where appropriate
+
+Design a portrait smartphone screen.
+
+At the top:
+
+place the current user’s circular avatar in the upper-left
+add a small rounded purple control or icon in the upper-right
+show a large centered heading: “GROUP INFO”
+optionally include a smaller subtitle such as “Coffee Meetup · Today at 3:30 PM”
+
+Below the heading, create a vertical stack of participant attendance cards.
+
+Each participant card should:
+
+be large and highly rounded
+include a circular avatar on the left
+show the participant’s first name beside or under the avatar
+display a large attendance status on the right
+use generous spacing and soft shadows
+
+Include approximately four participants with a mix of statuses.
+
+Example statuses:
+
+soft mint-green card with “ATTENDING!”
+soft mint-green card with “ATTENDING!”
+soft warm-yellow card with “PENDING…”
+soft warm-yellow card with “PENDING…”
+
+Keep the green and yellow tones pastel and soft so the purple branding still feels dominant.
+
+Optionally show a small summary near the participant list such as:
+“2 attending · 2 pending”
+
+At the bottom of the screen, place a large rounded red “Cancel Meetup” button. The red should feel elegant and slightly muted rather than harsh, while still clearly representing a destructive action.
+
+The overall hierarchy should feel spacious, simple, playful, and premium. The participant cards should be the main visual focus.
+
+This is a static UI concept only. Do not create real attendance controls, participant management, cancellation behavior, navigation, backend logic, or working buttons.
+
+The result should look like a professional high-fidelity mobile app mockup and should feel visually consistent with the purple meetup-map screen while remaining an original interface.
