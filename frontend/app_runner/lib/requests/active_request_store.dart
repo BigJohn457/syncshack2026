@@ -35,6 +35,24 @@ class ActiveMeetupRequest {
   bool get hasMatch => acceptedCount > 0 && meetupId.isNotEmpty;
   bool get isFull => hasMatch && acceptedCount >= maximumPeople;
 
+  ActiveMeetupRequest withStatus({
+    required int acceptedCount,
+    required String meetupId,
+  }) {
+    return ActiveMeetupRequest(
+      id: id,
+      activity: activity,
+      people: people,
+      place: place,
+      time: time,
+      latitude: latitude,
+      longitude: longitude,
+      expiresAt: expiresAt,
+      acceptedCount: acceptedCount,
+      meetupId: meetupId,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'activity': activity,

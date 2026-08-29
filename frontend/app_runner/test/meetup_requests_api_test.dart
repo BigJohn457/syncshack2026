@@ -7,6 +7,35 @@ import 'package:http/testing.dart';
 import 'package:latlong2/latlong.dart';
 
 void main() {
+  test('fetches creator request status for waiting-page polling', () async {
+    late http.Request captured;
+    final client = MockClient((request) async {
+      captured = request;
+      return http.Response(
+        jsonEncode({
+          'success': true,
+          'data': {
+            'request_id': 'request-1',
+            'meetup_id': 'meetup-1',
+            'request_status': 'open',
+            'meetup_status': 'matched',
+            'accepted_count': 2,
+            'max_people': 4,
+          },
+        }),
+        200,
+      );
+    });
+
+    final status = await MeetupRequestsApi(client: client).status('request-1');
+
+    expect(captured.url.path, '/api/home/get/request-status');
+    expect(captured.url.queryParameters['request_id'], 'request-1');
+    expect(status.meetupId, 'meetup-1');
+    expect(status.acceptedCount, 2);
+    expect(status.maxPeople, 4);
+  });
+
   test('cancels a request using the documented API payload', () async {
     late http.Request captured;
     final client = MockClient((request) async {

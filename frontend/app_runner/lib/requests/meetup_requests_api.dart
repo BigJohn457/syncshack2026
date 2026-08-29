@@ -7,11 +7,73 @@ import '../api_config.dart';
 import '../auth/auth_api.dart';
 import '../auth/http_client.dart';
 
+class MeetupRequestStatus {
+  const MeetupRequestStatus({
+    required this.requestId,
+    required this.meetupId,
+    required this.requestStatus,
+    required this.meetupStatus,
+    required this.acceptedCount,
+    required this.maxPeople,
+  });
+
+  final String requestId;
+  final String? meetupId;
+  final String requestStatus;
+  final String? meetupStatus;
+  final int acceptedCount;
+  final int maxPeople;
+
+  factory MeetupRequestStatus.fromJson(Map<String, dynamic> json) {
+    return MeetupRequestStatus(
+      requestId: json['request_id']?.toString() ?? '',
+      meetupId: json['meetup_id']?.toString(),
+      requestStatus: json['request_status']?.toString() ?? '',
+      meetupStatus: json['meetup_status']?.toString(),
+      acceptedCount: (json['accepted_count'] as num?)?.toInt() ?? 0,
+      maxPeople: (json['max_people'] as num?)?.toInt() ?? 1,
+    );
+  }
+}
+
 class MeetupRequestsApi {
   MeetupRequestsApi({http.Client? client})
     : _client = client ?? createHttpClient();
 
   final http.Client _client;
+
+  Future<MeetupRequestStatus> status(String requestId) async {
+    http.Response response;
+    try {
+      final uri = ApiConfig.uri(
+        '/api/home/get/request-status',
+      ).replace(queryParameters: {'request_id': requestId.trim()});
+      response = await _client.get(uri);
+    } on Exception {
+      throw const AuthException('Could not refresh the request status.');
+    }
+
+    Map<String, dynamic> payload = const {};
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) payload = decoded;
+    } on FormatException {
+      // Use the status fallback below for malformed server responses.
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AuthException(
+        payload['error']?.toString() ??
+            'Could not refresh the request (${response.statusCode}).',
+      );
+    }
+    final data = payload['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const AuthException(
+        'The server returned an invalid request status.',
+      );
+    }
+    return MeetupRequestStatus.fromJson(data);
+  }
 
   Future<void> cancel(String requestId) async {
     http.Response response;

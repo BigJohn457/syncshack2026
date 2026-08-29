@@ -82,9 +82,10 @@ class MeetupRepository:
             cursor.execute(
                 """
                 INSERT INTO meetup_participants (
-                    meetup_id, user_id, attendance_status
-                ) VALUES (%s, %s, 'joined')
-                ON DUPLICATE KEY UPDATE attendance_status = 'joined'
+                    meetup_id, user_id, attendance_status, is_reveal
+                ) VALUES (%s, %s, 'joined', FALSE)
+                ON DUPLICATE KEY UPDATE
+                    attendance_status = 'joined', is_reveal = FALSE
                 """,
                 (acceptance.meetup_id, user_id),
             )
@@ -123,7 +124,7 @@ class MeetupRepository:
 
             cursor.execute(
                 """
-                SELECT attendance_status, joined_at
+                SELECT attendance_status, joined_at, is_reveal
                 FROM meetup_participants
                 WHERE meetup_id = %s AND user_id = %s
                 LIMIT 1
@@ -156,6 +157,11 @@ class MeetupRepository:
                     ),
                     "joined_at": self._serialize_datetime(
                         meetup_participant["joined_at"]
+                        if meetup_participant
+                        else None
+                    ),
+                    "is_reveal": (
+                        bool(meetup_participant["is_reveal"])
                         if meetup_participant
                         else None
                     ),

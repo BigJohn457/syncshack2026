@@ -32,6 +32,49 @@ def test_health_endpoint():
     assert response.get_json() == {"status": "ok"}
 
 
+def test_request_status_requires_creator_identity():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/home/get/request-status",
+            query_string={"request_id": "request-001"},
+        )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "X-User-ID header is required"
+
+
+def test_request_status_returns_creator_polling_data(monkeypatch):
+    import importlib
+
+    home_routes = importlib.import_module("app.routes.home")
+    expected = {
+        "request_id": "request-001",
+        "meetup_id": "meetup-001",
+        "request_status": "open",
+        "meetup_status": "matched",
+        "accepted_count": 2,
+        "max_people": 4,
+    }
+    monkeypatch.setattr(
+        home_routes.request_repository,
+        "get_status",
+        lambda request_id, user_id: expected,
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/home/get/request-status",
+            query_string={"request_id": "request-001"},
+            headers={"X-User-ID": "creator-123"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True, "data": expected}
+
+
 def test_feature_routes_are_registered_separately():
     app = create_app("testing")
 
@@ -578,6 +621,7 @@ def test_participant_status_returns_both_tables(monkeypatch):
             "exists": True,
             "attendance_status": "joined",
             "joined_at": "2026-08-30T09:00:00",
+            "is_reveal": False,
         },
         "request_participant": {
             "exists": True,

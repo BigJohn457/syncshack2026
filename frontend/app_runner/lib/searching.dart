@@ -7,7 +7,6 @@ import 'auth/auth_api.dart';
 import 'chat.dart';
 import 'main.dart' show HomePage;
 import 'map_style.dart';
-import 'meetups/meetup_api.dart';
 import 'requests/active_request_store.dart';
 import 'requests/meetup_requests_api.dart';
 
@@ -54,7 +53,6 @@ class _SearchingPageState extends State<SearchingPage>
     with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
   final MeetupRequestsApi _requestsApi = MeetupRequestsApi();
-  final MeetupApi _meetupApi = MeetupApi();
   late final LatLng _initialCenter = LatLng(widget.latitude, widget.longitude);
 
   late AnimationController _pulseController;
@@ -62,8 +60,9 @@ class _SearchingPageState extends State<SearchingPage>
   bool _cancelling = false;
   Timer? _statusTimer;
   late int _acceptedCount = widget.acceptedCount;
-  late final String _meetupId = widget.meetupId;
+  late String _meetupId = widget.meetupId;
   bool _openingChat = false;
+  bool _pollingStatus = false;
 
   @override
   void initState() {
@@ -78,11 +77,11 @@ class _SearchingPageState extends State<SearchingPage>
       end: 1.0,
     ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
 
-    if (_meetupId.isNotEmpty) {
-      _pollParticipantStatus();
+    if (widget.requestId.isNotEmpty) {
+      _pollRequestStatus();
       _statusTimer = Timer.periodic(
         const Duration(seconds: 5),
-        (_) => _pollParticipantStatus(),
+        (_) => _pollRequestStatus(),
       );
     }
   }
@@ -94,38 +93,45 @@ class _SearchingPageState extends State<SearchingPage>
     super.dispose();
   }
 
-  Future<void> _pollParticipantStatus() async {
-    if (_meetupId.isEmpty || _openingChat) return;
+  Future<void> _pollRequestStatus() async {
+    if (widget.requestId.isEmpty || _openingChat || _pollingStatus) return;
+    _pollingStatus = true;
     try {
-      final results = await Future.wait<Object>([
-        _meetupApi.participantStatus(_meetupId),
-        _meetupApi.participants(_meetupId),
-      ]);
-      final status = results[0] as ParticipantStatus;
-      final participants = results[1] as List<MeetupParticipant>;
+      final status = await _requestsApi.status(widget.requestId);
       if (!mounted) return;
-      final acceptedCount = participants.where((item) => item.isActive).length;
-      if (acceptedCount != _acceptedCount) {
-        setState(() => _acceptedCount = acceptedCount);
-      }
-      if (status.hasJoined) {
-        final maximumPeople = int.tryParse(widget.people.split('-').last) ?? 1;
-        if (_acceptedCount >= maximumPeople) {
-          _openingChat = true;
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute<void>(
-              builder: (_) => ChatPage(
-                activity: widget.activity,
-                place: widget.place,
-                meetupId: _meetupId,
-              ),
+      final meetupId = status.meetupId?.trim() ?? '';
+      if (status.acceptedCount != _acceptedCount || meetupId != _meetupId) {
+        setState(() {
+          _acceptedCount = status.acceptedCount;
+          _meetupId = meetupId;
+        });
+        final active = await ActiveRequestStore.load();
+        if (active != null && mounted) {
+          await ActiveRequestStore.save(
+            active.withStatus(
+              acceptedCount: status.acceptedCount,
+              meetupId: meetupId,
             ),
           );
         }
       }
+      if (_meetupId.isNotEmpty && _acceptedCount >= status.maxPeople) {
+        _openingChat = true;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => ChatPage(
+              activity: widget.activity,
+              place: widget.place,
+              meetupId: _meetupId,
+            ),
+          ),
+        );
+      }
     } on AuthException {
       // Polling retries automatically; explicit actions show errors.
+    } finally {
+      _pollingStatus = false;
     }
   }
 

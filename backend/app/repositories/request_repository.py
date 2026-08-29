@@ -307,7 +307,8 @@ class RequestRepository:
                     INSERT INTO meetup_participants (
                         meetup_id, user_id, attendance_status, is_reveal
                     ) VALUES (%s, %s, 'joined', FALSE)
-                    ON DUPLICATE KEY UPDATE attendance_status = 'joined'
+                    ON DUPLICATE KEY UPDATE
+                        attendance_status = 'joined', is_reveal = FALSE
                     """,
                     (meetup_id, meetup_request["creator_id"]),
                 )

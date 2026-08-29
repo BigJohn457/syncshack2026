@@ -248,6 +248,91 @@ Success — `200`:
 
 ## Requests
 
+### Join a nearby request
+
+```http
+POST /api/request/post/join-request
+```
+
+Authentication: session cookie required; `X-User-ID` is a temporary fallback.
+This is the missing bridge between nearby-request results and invitation
+acceptance.
+
+Request body:
+
+```json
+{
+  "request_id": "request-001"
+}
+```
+
+The backend transaction:
+
+1. Confirms the request exists, is `open`, and belongs to another user.
+2. Creates a linked meetup with status `matched` if one does not exist.
+3. Adds the request creator to `meetup_participants` when creating the meetup.
+4. Creates or resets the caller's `request_participants` row to `pending`.
+5. Returns the `meetup_id` required by the acceptance endpoint.
+
+Success — `201`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "request_id": "request-001",
+    "meetup_id": "meetup-001",
+    "invitation_status": "pending"
+  }
+}
+```
+
+If the participant is already accepted, the same endpoint returns their
+existing `meetup_id` with `invitation_status: "accepted"`.
+
+Errors: `400` invalid input/missing identity, `404` request or user not found,
+`409` request is unavailable or belongs to the caller, `500` database error.
+
+Frontend join sequence:
+
+```text
+POST /api/request/post/join-request with request_id
+  -> read data.meetup_id
+POST /api/meetup/post/accept-invitation with meetup_id
+```
+
+### Poll creator request status
+
+```http
+GET /api/home/get/request-status?request_id=request-001
+```
+
+Authentication: session cookie required; `X-User-ID` is a temporary fallback.
+Only the request creator may poll this endpoint.
+
+Success — `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "request_id": "request-001",
+    "meetup_id": "meetup-001",
+    "request_status": "open",
+    "meetup_status": "matched",
+    "accepted_count": 2,
+    "max_people": 4
+  }
+}
+```
+
+Before the first user joins, `meetup_id` and `meetup_status` are `null` and
+`accepted_count` is `0`. Valid database meetup statuses are `matched`, `active`,
+`completed`, and `cancelled`; the backend does not return a `forming` status.
+
+Errors: `400` invalid input/missing identity, `403` caller is not the creator,
+`404` request not found, `500` database error.
+
 ### Cancel a request
 
 ```http
@@ -641,7 +726,8 @@ Success — `200`:
     "meetup_participant": {
       "exists": true,
       "attendance_status": "joined",
-      "joined_at": "2026-08-30T09:00:00"
+      "joined_at": "2026-08-30T09:00:00",
+      "is_reveal": false
     },
     "request_participant": {
       "exists": true,

@@ -36,6 +36,7 @@ def test_participant_status_maps_both_participant_tables():
             {
                 "attendance_status": "joined",
                 "joined_at": datetime(2026, 8, 30, 9, 0),
+                "is_reveal": False,
             },
             {
                 "status": "accepted",
@@ -52,6 +53,7 @@ def test_participant_status_maps_both_participant_tables():
         "exists": True,
         "attendance_status": "joined",
         "joined_at": "2026-08-30T09:00:00",
+        "is_reveal": False,
     }
     assert result["request_participant"]["status"] == "accepted"
 
