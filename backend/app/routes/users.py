@@ -63,3 +63,34 @@ def edit_own_profile():
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(success=True, data={}), 200
+
+
+@users.post("/post/personalization")
+def save_personalization():
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="X-User-ID header is required"), 400
+    body = request.get_json(silent=True) or {}
+    answers = body.get("answers")
+    required = {
+        "about_me",
+        "interests",
+        "ideal_meetup",
+        "personality",
+        "conversation_topics",
+    }
+    if not isinstance(answers, dict) or any(
+        not str(answers.get(key, "")).strip() for key in required
+    ):
+        return jsonify(success=False, error="all profile answers are required"), 400
+    cleaned = {key: str(answers[key]).strip()[:1000] for key in required}
+    try:
+        user_repository.update_personalization(user_id, cleaned)
+    except ProfileUserNotFoundError:
+        return jsonify(success=False, error="user not found"), 404
+    except MySQLError as exc:
+        log_handled_exception("Personalization database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+    return jsonify(success=True, data={"answers": cleaned}), 200

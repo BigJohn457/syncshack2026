@@ -68,6 +68,20 @@ class AnonymousMeetupProfile {
   final String? imageUrl;
 }
 
+class SharedMeetupProfile {
+  const SharedMeetupProfile({
+    required this.name,
+    required this.reliabilityScore,
+    this.imageUrl,
+    this.answers = const {},
+  });
+
+  final String name;
+  final double reliabilityScore;
+  final String? imageUrl;
+  final Map<String, String> answers;
+}
+
 class MeetupApi {
   MeetupApi({http.Client? client}) : _client = client ?? createHttpClient();
   final http.Client _client;
@@ -150,6 +164,28 @@ class MeetupApi {
     return AnonymousMeetupProfile(
       name: data['anonymous_name']?.toString() ?? 'Anonymous member',
       imageUrl: image == null || image.isEmpty ? null : image,
+    );
+  }
+
+  Future<SharedMeetupProfile> sharedProfile(String userId) async {
+    final uri = ApiConfig.uri(
+      '/api/meetup/get/all-users-profiles',
+    ).replace(queryParameters: {'id': userId});
+    final payload = await _request(() => _client.get(uri));
+    final data = payload['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const AuthException('The server returned an invalid profile.');
+    }
+    final image = data['profile_image_url']?.toString().trim();
+    return SharedMeetupProfile(
+      name: '${data['first_name'] ?? ''} ${data['last_name'] ?? ''}'.trim(),
+      reliabilityScore: (data['reliability_score'] as num?)?.toDouble() ?? 0,
+      imageUrl: image == null || image.isEmpty ? null : image,
+      answers:
+          (data['personalization_answers'] as Map?)?.map(
+            (key, value) => MapEntry(key.toString(), value.toString()),
+          ) ??
+          const {},
     );
   }
 

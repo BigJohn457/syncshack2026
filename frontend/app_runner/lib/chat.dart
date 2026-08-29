@@ -395,22 +395,6 @@ class _ChatPageState extends State<ChatPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               // Circular Checkmark Badge
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFEDE7FA),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Center(
-                                  child: Icon(
-                                    Icons.check_rounded,
-                                    color: Color(0xFF6C3EE8),
-                                    size: 24,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 6),
                               Text(
                                 widget.activity,
                                 maxLines: 1,
@@ -449,8 +433,11 @@ class _ChatPageState extends State<ChatPage> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) =>
-                                        GpInfoPage(meetupId: widget.meetupId),
+                                    builder: (context) => GpInfoPage(
+                                      meetupId: widget.meetupId,
+                                      meetupTitle: widget.activity,
+                                      meetupSubtitle: widget.place,
+                                    ),
                                   ),
                                 );
                               },

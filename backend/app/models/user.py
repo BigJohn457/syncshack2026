@@ -10,6 +10,7 @@ class UserProfile:
     phone: str | None
     radius: float | None
     profile_image_url: str | None
+    personalization_answers: dict[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

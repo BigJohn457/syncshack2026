@@ -1,3 +1,4 @@
+import json
 from collections.abc import Callable
 
 from app.database import get_db_connection
@@ -26,6 +27,7 @@ class UserRepository:
                     phone,
                     radius,
                     profile_image_url
+                    , personalization_answers
                 FROM users
                 WHERE id = %s
                 LIMIT 1
@@ -43,6 +45,9 @@ class UserRepository:
                 phone=row["phone"],
                 radius=float(row["radius"]) if row["radius"] is not None else None,
                 profile_image_url=row["profile_image_url"],
+                personalization_answers=self._answers(
+                    row.get("personalization_answers")
+                ),
             )
         finally:
             cursor.close()
@@ -60,6 +65,7 @@ class UserRepository:
                     last_name,
                     profile_image_url,
                     reliability_score
+                    , personalization_answers
                 FROM users
                 WHERE id = %s
                 LIMIT 1
@@ -75,6 +81,9 @@ class UserRepository:
                 "last_name": row["last_name"],
                 "profile_image_url": row["profile_image_url"],
                 "reliability_score": float(row["reliability_score"]),
+                "personalization_answers": self._answers(
+                    row.get("personalization_answers")
+                ),
             }
         finally:
             cursor.close()
@@ -144,6 +153,38 @@ class UserRepository:
             )
             connection.commit()
             return update.to_profile()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            cursor.close()
+            connection.close()
+
+    @staticmethod
+    def _answers(value) -> dict[str, str]:
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except json.JSONDecodeError:
+                return {}
+        return value if isinstance(value, dict) else {}
+
+    def update_personalization(
+        self, user_id: str, answers: dict[str, str]
+    ) -> None:
+        connection = self.connection_factory()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                """
+                UPDATE users SET personalization_answers = %s
+                WHERE id = %s
+                """,
+                (json.dumps(answers), user_id),
+            )
+            if cursor.rowcount == 0:
+                raise UserNotFoundError(user_id)
+            connection.commit()
         except Exception:
             connection.rollback()
             raise

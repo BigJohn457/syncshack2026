@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'auth/auth_api.dart';
 import 'auth/auth_session.dart';
+import 'main.dart' show HomePage;
 import 'meetups/meetup_api.dart';
 import 'ratings/ratings_api.dart';
 
@@ -86,16 +87,26 @@ class _RatePageState extends State<RatePage> {
     try {
       final participants = await _meetupApi.participants(meetupId);
       final currentUserId = AuthSession.currentUserId;
+      final activeParticipants = participants
+          .where((participant) => participant.isActive)
+          .toList();
       final rateable = participants
           .where(
             (participant) =>
                 participant.userId != currentUserId && participant.isActive,
           )
           .toList();
+      final allRevealed =
+          activeParticipants.isNotEmpty &&
+          activeParticipants.every((participant) => participant.isReveal);
       final profiles = await Future.wait(
-        rateable.map(
-          (participant) => _meetupApi.anonymousProfile(participant.userId),
-        ),
+        rateable.map((participant) async {
+          if (allRevealed) {
+            final profile = await _meetupApi.sharedProfile(participant.userId);
+            return profile.name.isEmpty ? 'Member' : profile.name;
+          }
+          return (await _meetupApi.anonymousProfile(participant.userId)).name;
+        }),
       );
       if (!mounted) return;
       setState(() {
@@ -103,7 +114,7 @@ class _RatePageState extends State<RatePage> {
           rateable.length,
           (index) => MemberRating(
             userId: rateable[index].userId,
-            name: profiles[index].name,
+            name: profiles[index],
             isChecked: false,
           ),
         );
@@ -184,7 +195,7 @@ class _RatePageState extends State<RatePage> {
     }
     if (!mounted) return;
 
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    _goHome();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Row(
@@ -220,7 +231,14 @@ class _RatePageState extends State<RatePage> {
       if (mounted) setState(() => _submitting = false);
     }
     if (!mounted) return;
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    _goHome();
+  }
+
+  void _goHome() {
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const HomePage()),
+      (_) => false,
+    );
   }
 
   void _showError(String message) {

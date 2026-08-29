@@ -139,4 +139,32 @@ void main() {
     expect(captured.url.queryParameters['id'], 'user-2');
     expect(profile.name, 'Anonymous Panda');
   });
+
+  test('loads a shared profile after the group reveals', () async {
+    late http.Request captured;
+    final api = MeetupApi(
+      client: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'first_name': 'Blue',
+              'last_name': 'Panda',
+              'profile_image_url': 'https://example.com/panda.jpg',
+              'reliability_score': 96,
+            },
+          }),
+          200,
+        );
+      }),
+    );
+
+    final profile = await api.sharedProfile('user-2');
+
+    expect(captured.url.path, '/api/meetup/get/all-users-profiles');
+    expect(captured.url.queryParameters['id'], 'user-2');
+    expect(profile.name, 'Blue Panda');
+    expect(profile.reliabilityScore, 96);
+  });
 }

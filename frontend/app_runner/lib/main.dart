@@ -15,6 +15,7 @@ import 'edit_profile.dart';
 import 'map_style.dart';
 import 'meetups/meetup_api.dart';
 import 'profiles/profile_api.dart';
+import 'profile_questions.dart';
 import 'requests/nearby_requests_api.dart';
 import 'requests/active_request_store.dart';
 import 'requests/meetup_requests_api.dart';
@@ -57,6 +58,7 @@ class _HomePageState extends State<HomePage> {
   int _selectedCardIndex = 0;
   String? _selectedPinId;
   String _userName = '';
+  bool _profileQuestionsRequired = false;
   String _userStatus = '';
 
   // Map Controller for interactive moving/zooming
@@ -112,9 +114,10 @@ class _HomePageState extends State<HomePage> {
     try {
       final profile = await ProfileApi().fetch(userId);
       if (mounted) {
-        setState(
-          () => _userName = '${profile.firstName} ${profile.lastName}'.trim(),
-        );
+        setState(() {
+          _userName = '${profile.firstName} ${profile.lastName}'.trim();
+          _profileQuestionsRequired = !profile.hasPersonalization;
+        });
       }
     } on AuthException {
       // The edit profile screen exposes retry/error details.
@@ -492,37 +495,61 @@ class _HomePageState extends State<HomePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        GestureDetector(
-          onTap: _showProfileSheet,
-          child: Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFFF3F4FD),
-              border: Border.all(
-                color: const Color(0xFF7C4DFF).withOpacity(0.35),
-                width: 3.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF7C4DFF).withOpacity(0.2),
-                  blurRadius: 10,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(2.5),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: _showProfileSheet,
               child: Container(
-                decoration: const BoxDecoration(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Color(0xFF6C3EE8),
+                  color: const Color(0xFFF3F4FD),
+                  border: Border.all(
+                    color: const Color(0xFF7C4DFF).withOpacity(0.35),
+                    width: 3.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF7C4DFF).withOpacity(0.2),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
-                child: const Icon(Icons.person, color: Colors.white, size: 28),
+                child: Padding(
+                  padding: const EdgeInsets.all(2.5),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF6C3EE8),
+                    ),
+                    child: const Icon(
+                      Icons.person,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
+            if (_profileQuestionsRequired) ...[
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () async {
+                  final saved = await Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProfileQuestionsPage(),
+                    ),
+                  );
+                  if (saved == true) await _loadProfileSummary();
+                },
+                child: const Text('Answer required questions?'),
+              ),
+            ],
+          ],
         ),
 
         GestureDetector(

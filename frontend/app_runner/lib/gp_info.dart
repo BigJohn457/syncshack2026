@@ -24,6 +24,10 @@ class Participant {
   final String avatarEmoji;
   final Color avatarBgColor;
   final AttendanceStatus status;
+  final bool isReveal;
+  final String? imageUrl;
+  final double? reliabilityScore;
+  final Map<String, String> answers;
 
   const Participant({
     this.userId = '',
@@ -31,28 +35,167 @@ class Participant {
     required this.avatarEmoji,
     required this.avatarBgColor,
     required this.status,
+    this.isReveal = false,
+    this.imageUrl,
+    this.reliabilityScore,
+    this.answers = const {},
   });
 }
 
-class GpInfoPage extends StatelessWidget {
+class GpInfoPage extends StatefulWidget {
   final String meetupId;
   final String meetupTitle;
   final String meetupSubtitle;
-  final List<Participant> participants;
 
   const GpInfoPage({
     super.key,
     this.meetupId = '',
     this.meetupTitle = '',
     this.meetupSubtitle = '',
-    this.participants = const [],
   });
 
+  @override
+  State<GpInfoPage> createState() => _GpInfoPageState();
+}
+
+class _GpInfoPageState extends State<GpInfoPage> {
+  final MeetupApi _meetupApi = MeetupApi();
+  List<Participant> _participants = const [];
+  bool _loading = true;
+  bool _allRevealed = false;
+  String? _error;
+
   int get _attendingCount =>
-      participants.where((p) => p.status == AttendanceStatus.attending).length;
+      _participants.where((p) => p.status == AttendanceStatus.attending).length;
 
   int get _pendingCount =>
-      participants.where((p) => p.status == AttendanceStatus.pending).length;
+      _participants.where((p) => p.status == AttendanceStatus.pending).length;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadParticipants();
+  }
+
+  Future<void> _loadParticipants() async {
+    if (widget.meetupId.trim().isEmpty) {
+      setState(() {
+        _loading = false;
+        _error = 'This group is missing its meetup ID.';
+      });
+      return;
+    }
+    try {
+      final rows = await _meetupApi.participants(widget.meetupId.trim());
+      final active = rows.where((participant) => participant.isActive).toList();
+      final allRevealed =
+          active.isNotEmpty &&
+          active.every((participant) => participant.isReveal);
+      final profiles = await Future.wait(
+        rows.map((participant) async {
+          if (allRevealed) {
+            final profile = await _meetupApi.sharedProfile(participant.userId);
+            return Participant(
+              userId: participant.userId,
+              name: profile.name.isEmpty ? 'Member' : profile.name,
+              avatarEmoji: '👤',
+              avatarBgColor: _kPurple,
+              status: participant.isActive
+                  ? AttendanceStatus.attending
+                  : AttendanceStatus.pending,
+              isReveal: participant.isReveal,
+              imageUrl: profile.imageUrl,
+              reliabilityScore: profile.reliabilityScore,
+              answers: profile.answers,
+            );
+          }
+          final profile = await _meetupApi.anonymousProfile(participant.userId);
+          return Participant(
+            userId: participant.userId,
+            name: profile.name,
+            avatarEmoji: '🕵️',
+            avatarBgColor: _kPurple,
+            status: participant.isActive
+                ? AttendanceStatus.attending
+                : AttendanceStatus.pending,
+            isReveal: participant.isReveal,
+            imageUrl: profile.imageUrl,
+          );
+        }),
+      );
+      if (!mounted) return;
+      setState(() {
+        _participants = profiles;
+        _allRevealed = allRevealed;
+        _loading = false;
+        _error = null;
+      });
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+    }
+  }
+
+  void _showProfile(BuildContext context, Participant participant) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(participant.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 42,
+              backgroundColor: _kLavenderPill,
+              backgroundImage: participant.imageUrl == null
+                  ? null
+                  : NetworkImage(participant.imageUrl!),
+              child: participant.imageUrl == null
+                  ? const Icon(Icons.person, size: 44, color: _kPurple)
+                  : null,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Reliability score: '
+              '${participant.reliabilityScore?.toStringAsFixed(0) ?? '—'}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            ...participant.answers.entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${_answerLabel(entry.key)}\n${entry.value}',
+                    style: const TextStyle(height: 1.35),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _answerLabel(String key) => switch (key) {
+    'about_me' => 'About me',
+    'interests' => 'Interests',
+    'ideal_meetup' => 'Ideal meetup',
+    'personality' => 'Personality',
+    'conversation_topics' => 'Favourite conversation topics',
+    _ => key,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +350,7 @@ class GpInfoPage extends StatelessWidget {
                 // HEADER TITLE & ATTENDANCE SUMMARY PILL
                 // -------------------------------------------------------------
                 Text(
-                  meetupTitle,
+                  widget.meetupTitle,
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w900,
@@ -217,7 +360,7 @@ class GpInfoPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  meetupSubtitle,
+                  widget.meetupSubtitle,
                   style: const TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w500,
@@ -263,15 +406,36 @@ class GpInfoPage extends StatelessWidget {
                 // PARTICIPANT CARDS LIST
                 // -------------------------------------------------------------
                 Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: participants.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 14),
-                    itemBuilder: (context, index) {
-                      final p = participants[index];
-                      return _ParticipantCard(participant: p);
-                    },
-                  ),
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_error!, textAlign: TextAlign.center),
+                              TextButton(
+                                onPressed: _loadParticipants,
+                                child: const Text('Try again'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: _participants.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 14),
+                          itemBuilder: (context, index) {
+                            final p = _participants[index];
+                            return _ParticipantCard(
+                              participant: p,
+                              onTap: _allRevealed
+                                  ? () => _showProfile(context, p)
+                                  : null,
+                            );
+                          },
+                        ),
                 ),
 
                 // -------------------------------------------------------------
@@ -293,7 +457,9 @@ class GpInfoPage extends StatelessWidget {
                       GestureDetector(
                         onTap: () async {
                           try {
-                            await MeetupApi().finishParticipation(meetupId);
+                            await _meetupApi.finishParticipation(
+                              widget.meetupId,
+                            );
                           } on AuthException catch (error) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -309,11 +475,11 @@ class GpInfoPage extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (context) => RatePage(
-                                meetupId: meetupId,
-                                meetupType: meetupSubtitle.isEmpty
+                                meetupId: widget.meetupId,
+                                meetupType: widget.meetupSubtitle.isEmpty
                                     ? 'meetup'
-                                    : meetupSubtitle,
-                                members: participants
+                                    : widget.meetupSubtitle,
+                                members: _participants
                                     .where(
                                       (participant) =>
                                           participant.status ==
@@ -452,8 +618,9 @@ class GpInfoPage extends StatelessWidget {
 // -------------------------------------------------------------
 class _ParticipantCard extends StatelessWidget {
   final Participant participant;
+  final VoidCallback? onTap;
 
-  const _ParticipantCard({required this.participant});
+  const _ParticipantCard({required this.participant, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -466,142 +633,159 @@ class _ParticipantCard extends StatelessWidget {
         ? const Color(0xFF8B64F8)
         : const Color(0xFFE5A117);
 
-    return Container(
-      height: 82,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: cardBgColor,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: cardBorderColor, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.025),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Background Watermark Outline on Right Side
-          Positioned(
-            right: 0,
-            top: 6,
-            bottom: 6,
-            child: Opacity(
-              opacity: 0.12,
-              child: isAttending
-                  ? const Icon(
-                      Icons.check_circle_outline_rounded,
-                      size: 70,
-                      color: _kAttendingGreen,
-                    )
-                  : const Icon(
-                      Icons.hourglass_empty_rounded,
-                      size: 65,
-                      color: _kPendingYellow,
-                    ),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        height: 82,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: cardBgColor,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: cardBorderColor, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.025),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
             ),
-          ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // Background Watermark Outline on Right Side
+            Positioned(
+              right: 0,
+              top: 6,
+              bottom: 6,
+              child: Opacity(
+                opacity: 0.12,
+                child: isAttending
+                    ? const Icon(
+                        Icons.check_circle_outline_rounded,
+                        size: 70,
+                        color: _kAttendingGreen,
+                      )
+                    : const Icon(
+                        Icons.hourglass_empty_rounded,
+                        size: 65,
+                        color: _kPendingYellow,
+                      ),
+              ),
+            ),
 
-          // Foreground Content: Avatar + Name + Sparkles + Status Pill
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // 3D Avatar Memoji Circle
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: participant.avatarBgColor.withOpacity(0.18),
-                  border: Border.all(color: Colors.white, width: 2.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    participant.avatarEmoji,
-                    style: const TextStyle(fontSize: 28),
+            // Foreground Content: Avatar + Name + Sparkles + Status Pill
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // 3D Avatar Memoji Circle
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: participant.avatarBgColor.withOpacity(0.18),
+                    border: Border.all(color: Colors.white, width: 2.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: ClipOval(
+                    child: participant.imageUrl != null && onTap != null
+                        ? Image.network(
+                            participant.imageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Text(
+                                participant.avatarEmoji,
+                                style: const TextStyle(fontSize: 28),
+                              ),
+                            ),
+                          )
+                        : Center(
+                            child: Text(
+                              participant.avatarEmoji,
+                              style: const TextStyle(fontSize: 28),
+                            ),
+                          ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 14),
+                const SizedBox(width: 14),
 
-              // Name + Sparkles
-              Expanded(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        participant.name,
-                        style: const TextStyle(
-                          fontSize: 17.5,
-                          fontWeight: FontWeight.w800,
-                          color: _kPurpleDark,
-                          letterSpacing: -0.2,
+                // Name + Sparkles
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          participant.name,
+                          style: const TextStyle(
+                            fontSize: 17.5,
+                            fontWeight: FontWeight.w800,
+                            color: _kPurpleDark,
+                            letterSpacing: -0.2,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '✦',
-                      style: TextStyle(
-                        color: sparkleColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(width: 6),
+                      Text(
+                        '✦',
+                        style: TextStyle(
+                          color: sparkleColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      '✦',
-                      style: TextStyle(
-                        color: sparkleColor.withOpacity(0.7),
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(width: 2),
+                      Text(
+                        '✦',
+                        style: TextStyle(
+                          color: sparkleColor.withOpacity(0.7),
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Status Pill (Elevated White Container)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 9,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  badgeLabel,
-                  style: TextStyle(
-                    color: badgeTextColor,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.4,
+                    ],
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+
+                // Status Pill (Elevated White Container)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    badgeLabel,
+                    style: TextStyle(
+                      color: badgeTextColor,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

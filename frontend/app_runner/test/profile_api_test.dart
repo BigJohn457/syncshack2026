@@ -21,6 +21,13 @@ void main() {
               'phone': '0400000000',
               'radius': 5.5,
               'profile_image_url': 'https://example.com/avatar.jpg',
+              'personalization_answers': {
+                'about_me': 'Curious builder',
+                'interests': 'Coffee and code',
+                'ideal_meetup': 'A relaxed walk',
+                'personality': 'Warm and thoughtful',
+                'conversation_topics': 'Technology and travel',
+              },
             },
           }),
           200,
@@ -35,6 +42,7 @@ void main() {
     expect(captured.url.queryParameters['id'], 'user-1');
     expect(profile.firstName, 'Blue');
     expect(profile.radius, 5.5);
+    expect(profile.hasPersonalization, isTrue);
   });
 
   test('updates every editable database profile field', () async {
@@ -67,5 +75,27 @@ void main() {
       'radius': 5.5,
       'profile_image_url': 'https://example.com/avatar.jpg',
     });
+  });
+
+  test('saves profile personalization answers', () async {
+    late http.Request captured;
+    final api = ProfileApi(
+      client: MockClient((request) async {
+        captured = request;
+        return http.Response(jsonEncode({'success': true, 'data': {}}), 200);
+      }),
+    );
+    const answers = {
+      'about_me': 'Curious builder',
+      'interests': 'Coffee and code',
+      'ideal_meetup': 'A relaxed walk',
+      'personality': 'Warm and thoughtful',
+      'conversation_topics': 'Technology and travel',
+    };
+
+    await api.updatePersonalization(answers);
+
+    expect(captured.url.path, '/api/users/post/personalization');
+    expect(jsonDecode(captured.body), {'answers': answers});
   });
 }

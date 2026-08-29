@@ -14,6 +14,7 @@ class UserProfile {
     required this.phone,
     required this.radius,
     this.profileImageUrl,
+    this.personalizationAnswers = const {},
   });
 
   final String firstName;
@@ -22,6 +23,10 @@ class UserProfile {
   final String phone;
   final double radius;
   final String? profileImageUrl;
+  final Map<String, String> personalizationAnswers;
+  bool get hasPersonalization =>
+      personalizationAnswers.length >= 5 &&
+      personalizationAnswers.values.every((value) => value.trim().isNotEmpty);
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     final imageUrl = json['profile_image_url']?.toString().trim();
@@ -32,6 +37,11 @@ class UserProfile {
       phone: json['phone']?.toString() ?? '',
       radius: (json['radius'] as num?)?.toDouble() ?? 0,
       profileImageUrl: imageUrl == null || imageUrl.isEmpty ? null : imageUrl,
+      personalizationAnswers:
+          (json['personalization_answers'] as Map?)?.map(
+            (key, value) => MapEntry(key.toString(), value.toString()),
+          ) ??
+          const {},
     );
   }
 }
@@ -65,6 +75,16 @@ class ProfileApi {
           'radius': profile.radius,
           'profile_image_url': profile.profileImageUrl,
         }),
+      ),
+    );
+  }
+
+  Future<void> updatePersonalization(Map<String, String> answers) async {
+    await _request(
+      () => _client.post(
+        ApiConfig.uri('/api/users/post/personalization'),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({'answers': answers}),
       ),
     );
   }
