@@ -2,6 +2,7 @@ from flask import Blueprint, current_app, jsonify, request, session
 from mysql.connector import Error as MySQLError
 
 from app.models import MessageSubmission
+from app.logging_config import log_handled_exception
 from app.repositories import (
     ChatAccessDeniedError,
     MeetupChatRepository,
@@ -28,9 +29,11 @@ def get_all_messages():
     meetup_id = meetup_id.strip()
     try:
         messages = meetup_chat_repository.get_all_messages(meetup_id)
-    except MeetupNotFoundError:
+    except MeetupNotFoundError as exc:
+        log_handled_exception("Meetup chat not found", exc)
         return jsonify(success=False, error="meetup not found"), 404
-    except MySQLError:
+    except MySQLError as exc:
+        log_handled_exception("Meetup chat database error", exc)
         return jsonify(success=False, error="database operation failed"), 500
 
     timezone_name = current_app.config["API_TIMEZONE"]
@@ -55,12 +58,16 @@ def send_message():
         submission = MessageSubmission.from_dict(request.get_json(silent=True))
         message = meetup_chat_repository.create_message(sender_id, submission)
     except ValueError as exc:
+        log_handled_exception("Send message validation failed", exc)
         return jsonify(success=False, error=str(exc)), 400
-    except MeetupNotFoundError:
+    except MeetupNotFoundError as exc:
+        log_handled_exception("Send message meetup not found", exc)
         return jsonify(success=False, error="meetup not found"), 404
     except ChatAccessDeniedError as exc:
+        log_handled_exception("Send message access denied", exc)
         return jsonify(success=False, error=str(exc)), 403
-    except MySQLError:
+    except MySQLError as exc:
+        log_handled_exception("Send message database error", exc)
         return jsonify(success=False, error="database operation failed"), 500
 
     timezone_name = current_app.config["API_TIMEZONE"]

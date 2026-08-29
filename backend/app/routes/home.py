@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 from mysql.connector import Error as MySQLError
 
 from app.repositories import RequestNotFoundError, RequestRepository, SystemRepository
+from app.logging_config import log_handled_exception
 from ._helpers import read_varchar_id
 
 home = Blueprint("home", __name__, url_prefix="/home")
@@ -29,13 +30,16 @@ def get_request_details():
     try:
         request_id = read_varchar_id(request, "request_id")
     except ValueError as exc:
+        log_handled_exception("Request details validation failed", exc)
         return jsonify(success=False, error=str(exc)), 400
 
     try:
         details = request_repository.get_details(request_id)
-    except RequestNotFoundError:
+    except RequestNotFoundError as exc:
+        log_handled_exception("Request details not found", exc)
         return jsonify(success=False, error="request not found"), 404
-    except MySQLError:
+    except MySQLError as exc:
+        log_handled_exception("Request details database error", exc)
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(success=True, data=details), 200
@@ -46,13 +50,16 @@ def get_own_request():
     try:
         request_id = read_varchar_id(request, "request_id")
     except ValueError as exc:
+        log_handled_exception("Own request validation failed", exc)
         return jsonify(success=False, error=str(exc)), 400
 
     try:
         own_request = request_repository.get_own_request(request_id)
-    except RequestNotFoundError:
+    except RequestNotFoundError as exc:
+        log_handled_exception("Own request not found", exc)
         return jsonify(success=False, error="request not found"), 404
-    except (MySQLError, json.JSONDecodeError):
+    except (MySQLError, json.JSONDecodeError) as exc:
+        log_handled_exception("Own request database error", exc)
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(success=True, data=own_request), 200

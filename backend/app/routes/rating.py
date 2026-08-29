@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request, session
 from mysql.connector import Error as MySQLError
 
 from app.models import RatingSubmission
+from app.logging_config import log_handled_exception
 from app.repositories import (
     DuplicateRatingError,
     RatingEligibilityError,
@@ -30,12 +31,16 @@ def submit_rating():
         submission = RatingSubmission.from_dict(request.get_json(silent=True))
         rating_repository.create(from_user_id, submission)
     except ValueError as exc:
+        log_handled_exception("Rating validation failed", exc)
         return jsonify(success=False, error=str(exc)), 400
     except RatingEligibilityError as exc:
+        log_handled_exception("Rating eligibility rejected", exc)
         return jsonify(success=False, error=str(exc)), 403
-    except DuplicateRatingError:
+    except DuplicateRatingError as exc:
+        log_handled_exception("Duplicate rating rejected", exc)
         return jsonify(success=False, error="rating already submitted"), 409
-    except MySQLError:
+    except MySQLError as exc:
+        log_handled_exception("Rating database error", exc)
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(
