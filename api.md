@@ -359,6 +359,55 @@ Errors: `400` missing/invalid ID, `404` request not found, `500` database error.
 
 ## Meetup chat
 
+### Send a message
+
+```http
+POST /api/meetup-chat/post/send-message
+```
+
+Authentication: session cookie required; `X-User-ID` is a temporary fallback.
+
+Request body:
+
+```json
+{
+  "meetup_id": "meetup-001",
+  "message": "Hey! I'm already at the cafe"
+}
+```
+
+Rules:
+
+- `meetup_id` is required and cannot exceed 36 characters.
+- `message` is required and cannot exceed 5000 characters.
+- The meetup must exist and cannot be cancelled.
+- The sender must be a meetup participant with `joined` or `attended` status.
+
+Success — `201`:
+
+```json
+{
+  "success": true,
+  "message": "Message sent successfully",
+  "data": {
+    "meetup_id": "meetup-001",
+    "message": {
+      "id": "msg-001",
+      "sender_id": "user-123",
+      "sender": {
+        "anonymous_name": "Blue Panda",
+        "img_url": "https://example.com/avatar1.jpg"
+      },
+      "message": "Hey! I'm already at the cafe",
+      "created_at": "2026-08-29T12:25:14+10:00"
+    }
+  }
+}
+```
+
+Errors: `400` invalid input/missing identity, `403` sender cannot access the
+chat, `404` meetup not found, `500` database error.
+
 ### Get all messages for a meetup
 
 ```http

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'searching.dart';
 
 // "hey!" brand palette
 const _kPurple = Color(0xFF7C4DFF);
@@ -176,6 +177,18 @@ class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
                           _hour,
                           _minute,
                           _isAm,
+                        );
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SearchingPage(
+                              activity: _activityController.text,
+                              people: _peopleController.text,
+                              place: _placeController.text,
+                              time:
+                                  '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')} ${_isAm ? "AM" : "PM"}',
+                            ),
+                          ),
                         );
                       },
                     ),
