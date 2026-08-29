@@ -3,6 +3,7 @@ from mysql.connector import Error as MySQLError, IntegrityError
 
 from app.models import UserProfileUpdate
 from app.repositories import ProfileUserNotFoundError, UserRepository
+from ._helpers import read_varchar_id
 
 users = Blueprint("users", __name__, url_prefix="/users")
 user_repository = UserRepository()
@@ -16,18 +17,10 @@ def list_users():
 
 @users.get("/get/own-profile")
 def get_own_profile():
-    body = request.get_json(silent=True) or {}
-    user_id = request.args.get("id")
-    if user_id is None:
-        user_id = body.get("id")
-
-    if user_id is None or user_id == "":
-        return jsonify(success=False, error="id is required"), 400
-
     try:
-        user_id = int(user_id)
-    except (TypeError, ValueError):
-        return jsonify(success=False, error="id must be an integer"), 400
+        user_id = read_varchar_id(request, "id")
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
 
     try:
         profile = user_repository.get_profile(user_id)

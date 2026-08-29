@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from mysql.connector import Error as MySQLError
 
 from app.repositories import UserRepository
+from ._helpers import read_varchar_id
 
 meetup = Blueprint("meetup", __name__, url_prefix="/meetups")
 meetup_api = Blueprint("meetup_api", __name__, url_prefix="/meetup")
@@ -16,15 +17,10 @@ def list_meetups():
 
 @meetup_api.get("/get/all-users-profiles")
 def get_all_users_profiles():
-    raw_user_id = request.args.get("id")
-    if raw_user_id is None:
-        body = request.get_json(silent=True) or {}
-        raw_user_id = body.get("id")
-
     try:
-        user_id = int(raw_user_id)
-    except (TypeError, ValueError):
-        return jsonify(success=False, error="id must be an integer"), 400
+        user_id = read_varchar_id(request, "id")
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
 
     try:
         profile = user_repository.get_shared_profile(user_id)
@@ -39,15 +35,10 @@ def get_all_users_profiles():
 
 @meetup_api.get("/get/all-anonymous-profiles")
 def get_all_anonymous_profiles():
-    raw_user_id = request.args.get("id")
-    if raw_user_id is None:
-        body = request.get_json(silent=True) or {}
-        raw_user_id = body.get("id")
-
     try:
-        user_id = int(raw_user_id)
-    except (TypeError, ValueError):
-        return jsonify(success=False, error="id must be an integer"), 400
+        user_id = read_varchar_id(request, "id")
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
 
     try:
         profile = user_repository.get_anonymous_profile(user_id)

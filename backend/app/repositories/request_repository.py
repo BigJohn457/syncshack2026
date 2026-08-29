@@ -107,7 +107,7 @@ class RequestRepository:
             cursor.close()
             connection.close()
 
-    def get_details(self, request_id: int) -> dict:
+    def get_details(self, request_id: str) -> dict:
         connection = self.connection_factory()
         cursor = connection.cursor(dictionary=True)
 
@@ -155,7 +155,7 @@ class RequestRepository:
             cursor.close()
             connection.close()
 
-    def get_own_request(self, request_id: int) -> dict:
+    def get_own_request(self, request_id: str) -> dict:
         connection = self.connection_factory()
         cursor = connection.cursor(dictionary=True)
 

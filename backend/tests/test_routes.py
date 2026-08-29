@@ -158,26 +158,34 @@ def test_get_own_profile_returns_selected_user_fields(monkeypatch):
     import importlib
 
     user_routes = importlib.import_module("app.routes.users")
-    monkeypatch.setattr(
-        user_routes.user_repository,
-        "get_profile",
-        lambda user_id: UserProfile(
+    received_ids = []
+
+    def get_profile(user_id):
+        received_ids.append(user_id)
+        return UserProfile(
             first_name="Blue",
             last_name="Panda",
             email="blue@example.com",
             phone="0400000000",
             radius=5.5,
             profile_image_url="https://example.com/avatar.jpg",
-        ),
+        )
+
+    monkeypatch.setattr(
+        user_routes.user_repository,
+        "get_profile",
+        get_profile,
     )
     app = create_app("testing")
 
     with app.test_client() as client:
         response = client.get(
-            "/api/users/get/own-profile", query_string={"id": 123}
+            "/api/users/get/own-profile",
+            query_string={"id": "e8d66ac8-494f-4208-a96f-c75654504847"},
         )
 
     assert response.status_code == 200
+    assert received_ids == ["e8d66ac8-494f-4208-a96f-c75654504847"]
     assert response.get_json() == {
         "success": True,
         "data": {
@@ -189,6 +197,18 @@ def test_get_own_profile_returns_selected_user_fields(monkeypatch):
             "profile_image_url": "https://example.com/avatar.jpg",
         },
     }
+
+
+def test_varchar_id_rejects_values_longer_than_database_column():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/users/get/own-profile", query_string={"id": "x" * 37}
+        )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "id cannot exceed 36 characters"
 
 
 def test_edit_profile_requires_user_identity():

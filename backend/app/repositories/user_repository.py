@@ -12,7 +12,7 @@ class UserRepository:
     def __init__(self, connection_factory: Callable = get_db_connection):
         self.connection_factory = connection_factory
 
-    def get_profile(self, user_id: int) -> UserProfile | None:
+    def get_profile(self, user_id: str) -> UserProfile | None:
         connection = self.connection_factory()
         cursor = connection.cursor(dictionary=True)
 
@@ -48,7 +48,7 @@ class UserRepository:
             cursor.close()
             connection.close()
 
-    def get_shared_profile(self, user_id: int) -> dict | None:
+    def get_shared_profile(self, user_id: str) -> dict | None:
         connection = self.connection_factory()
         cursor = connection.cursor(dictionary=True)
 
@@ -80,7 +80,7 @@ class UserRepository:
             cursor.close()
             connection.close()
 
-    def get_anonymous_profile(self, user_id: int) -> dict | None:
+    def get_anonymous_profile(self, user_id: str) -> dict | None:
         connection = self.connection_factory()
         cursor = connection.cursor(dictionary=True)
 
