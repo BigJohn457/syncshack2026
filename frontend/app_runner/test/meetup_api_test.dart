@@ -98,4 +98,30 @@ void main() {
     expect(captured.url.path, '/api/meetup/post/reveal-profile');
     expect(jsonDecode(captured.body), {'meetup_id': 'meetup-1'});
   });
+
+  test('loads an anonymous participant profile for rating', () async {
+    late http.Request captured;
+    final api = MeetupApi(
+      client: MockClient((request) async {
+        captured = request;
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'anonymous_name': 'Anonymous Panda',
+              'profile_image_url': null,
+              'reliability_score': 95,
+            },
+          }),
+          200,
+        );
+      }),
+    );
+
+    final profile = await api.anonymousProfile('user-2');
+
+    expect(captured.url.path, '/api/meetup/get/all-anonymous-profiles');
+    expect(captured.url.queryParameters['id'], 'user-2');
+    expect(profile.name, 'Anonymous Panda');
+  });
 }

@@ -60,6 +60,13 @@ class MeetupParticipant {
   }
 }
 
+class AnonymousMeetupProfile {
+  const AnonymousMeetupProfile({required this.name, this.imageUrl});
+
+  final String name;
+  final String? imageUrl;
+}
+
 class MeetupApi {
   MeetupApi({http.Client? client}) : _client = client ?? createHttpClient();
   final http.Client _client;
@@ -114,6 +121,24 @@ class MeetupApi {
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode({'meetup_id': meetupId}),
       ),
+    );
+  }
+
+  Future<AnonymousMeetupProfile> anonymousProfile(String userId) async {
+    final uri = ApiConfig.uri(
+      '/api/meetup/get/all-anonymous-profiles',
+    ).replace(queryParameters: {'id': userId});
+    final payload = await _request(() => _client.get(uri));
+    final data = payload['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const AuthException(
+        'The server returned an invalid participant profile.',
+      );
+    }
+    final image = data['profile_image_url']?.toString().trim();
+    return AnonymousMeetupProfile(
+      name: data['anonymous_name']?.toString() ?? 'Anonymous member',
+      imageUrl: image == null || image.isEmpty ? null : image,
     );
   }
 

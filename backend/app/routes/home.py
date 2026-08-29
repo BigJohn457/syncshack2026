@@ -95,3 +95,18 @@ def get_request_status():
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(success=True, data=status), 200
+
+
+@home.get("/get/current-stage")
+def get_current_stage():
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="authentication is required"), 401
+    try:
+        current_stage = request_repository.get_current_stage(user_id)
+    except MySQLError as exc:
+        log_handled_exception("Current stage database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+    return jsonify(success=True, data=current_stage), 200

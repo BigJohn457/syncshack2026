@@ -404,3 +404,73 @@ class RequestRepository:
         finally:
             cursor.close()
             connection.close()
+
+    def get_current_stage(self, user_id: str) -> dict | None:
+        """Return the user's latest unfinished request/meetup from the database."""
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                SELECT r.request_id, r.title, r.location,
+                    r.min_people, r.max_people, r.meet_time, r.expires_at,
+                    r.status AS request_status, m.meetup_id,
+                    m.status AS meetup_status,
+                    (SELECT COUNT(*) FROM request_participants AS accepted
+                     WHERE accepted.request_id = r.request_id
+                       AND accepted.status = 'accepted') AS accepted_count
+                FROM requests AS r
+                LEFT JOIN meetups AS m ON m.request_id = r.request_id
+                LEFT JOIN meetup_participants AS mp
+                    ON mp.meetup_id = m.meetup_id AND mp.user_id = %s
+                LEFT JOIN request_participants AS rp
+                    ON rp.request_id = r.request_id AND rp.user_id = %s
+                WHERE (r.creator_id = %s OR mp.user_id IS NOT NULL
+                       OR rp.status IN ('pending', 'accepted'))
+                  AND r.status NOT IN ('cancelled', 'expired')
+                  AND COALESCE(m.status, '') != 'cancelled'
+                  AND COALESCE(mp.attendance_status, 'joined')
+                      NOT IN ('left', 'cancelled')
+                ORDER BY CASE COALESCE(m.status, '')
+                    WHEN 'completed' THEN 1 WHEN 'active' THEN 2
+                    WHEN 'matched' THEN 3 ELSE 4 END, r.meet_time DESC
+                LIMIT 1
+                """,
+                (user_id, user_id, user_id),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            meetup_status = row["meetup_status"]
+            stage = {
+                "completed": "rating",
+                "active": "meetup",
+                "matched": "chat",
+            }.get(meetup_status, "requesting")
+            location = row["location"]
+            if isinstance(location, str):
+                try:
+                    location = json.loads(location)
+                except json.JSONDecodeError:
+                    location = {}
+            if not isinstance(location, dict):
+                location = {}
+            return {
+                "stage": stage,
+                "request_id": row["request_id"],
+                "meetup_id": row["meetup_id"],
+                "activity": row["title"],
+                "place": location.get("place_name", ""),
+                "latitude": float(location.get("latitude", -33.8688)),
+                "longitude": float(location.get("longitude", 151.2093)),
+                "min_people": int(row["min_people"]),
+                "max_people": int(row["max_people"]),
+                "meet_time": row["meet_time"].isoformat(),
+                "expires_at": row["expires_at"].isoformat(),
+                "request_status": row["request_status"],
+                "meetup_status": meetup_status,
+                "accepted_count": int(row["accepted_count"]),
+            }
+        finally:
+            cursor.close()
+            connection.close()

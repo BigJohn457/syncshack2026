@@ -333,6 +333,26 @@ Before the first user joins, `meetup_id` and `meetup_status` are `null` and
 Errors: `400` invalid input/missing identity, `403` caller is not the creator,
 `404` request not found, `500` database error.
 
+### Restore the current app stage
+
+```http
+GET /api/home/get/current-stage
+```
+
+Authentication: session cookie required; `X-User-ID` remains a temporary
+fallback. This endpoint queries the request, meetup, and participant tables on
+every call; the frontend does not restore meetup progress from device storage.
+
+`data` is `null` when the user has no unfinished meetup flow. Otherwise it
+contains the request and meetup display fields plus one of these stages:
+
+- `requesting` for an open request without a meetup
+- `chat` for a matched meetup
+- `meetup` for an active meetup
+- `rating` for a completed meetup
+
+Errors: `401` missing authentication, `500` database error.
+
 ### Cancel a request
 
 ```http

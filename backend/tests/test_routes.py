@@ -75,6 +75,40 @@ def test_request_status_returns_creator_polling_data(monkeypatch):
     assert response.get_json() == {"success": True, "data": expected}
 
 
+def test_current_stage_returns_database_stage(monkeypatch):
+    import importlib
+
+    home_routes = importlib.import_module("app.routes.home")
+    stage = {
+        "stage": "chat",
+        "request_id": "request-001",
+        "meetup_id": "meetup-001",
+    }
+    monkeypatch.setattr(
+        home_routes.request_repository,
+        "get_current_stage",
+        lambda user_id: stage,
+    )
+
+    app = create_app("testing")
+    with app.test_client() as client:
+        response = client.get(
+            "/api/home/get/current-stage",
+            headers={"X-User-ID": "user-123"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True, "data": stage}
+
+
+def test_current_stage_requires_authentication():
+    app = create_app("testing")
+    with app.test_client() as client:
+        response = client.get("/api/home/get/current-stage")
+
+    assert response.status_code == 401
+
+
 def test_feature_routes_are_registered_separately():
     app = create_app("testing")
 

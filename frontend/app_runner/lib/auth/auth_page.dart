@@ -5,6 +5,8 @@ import '../main.dart' show HomePage;
 import '../requests/active_request_store.dart';
 import '../searching.dart';
 import '../chat.dart';
+import '../gp_info.dart';
+import '../rate.dart';
 import '../uploads/image_upload_api.dart';
 import 'auth_api.dart';
 import 'auth_session.dart';
@@ -147,14 +149,27 @@ class _AuthPageState extends State<AuthPage> {
         MaterialPageRoute<void>(
           builder: (_) {
             if (activeRequest == null) return const HomePage();
-            if (activeRequest.isFull) {
-              return ChatPage(
-                activity: activeRequest.activity,
-                place: activeRequest.place,
-                meetupId: activeRequest.meetupId,
-              );
+            switch (activeRequest.stage) {
+              case UserMeetupStage.requesting:
+                return SearchingPage.fromRequest(activeRequest);
+              case UserMeetupStage.chat:
+                return ChatPage(
+                  activity: activeRequest.activity,
+                  place: activeRequest.place,
+                  meetupId: activeRequest.meetupId,
+                );
+              case UserMeetupStage.meetup:
+                return GpInfoPage(
+                  meetupId: activeRequest.meetupId,
+                  meetupTitle: activeRequest.activity,
+                  meetupSubtitle: activeRequest.place,
+                );
+              case UserMeetupStage.rating:
+                return RatePage(
+                  meetupId: activeRequest.meetupId,
+                  meetupType: activeRequest.activity,
+                );
             }
-            return SearchingPage.fromRequest(activeRequest);
           },
         ),
       );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'auth/auth_api.dart';
+import 'auth/auth_session.dart';
+import 'meetups/meetup_api.dart';
 import 'ratings/ratings_api.dart';
 
 // "hey!" brand palette
@@ -12,7 +14,7 @@ class MemberRating {
   final String userId;
   final String name;
   bool isChecked;
-  int rating; // 0 to 3
+  int rating; // 0 to 5
 
   MemberRating({
     required this.userId,
@@ -48,7 +50,10 @@ class RateableMember {
 class _RatePageState extends State<RatePage> {
   late List<MemberRating> _members;
   final RatingsApi _ratingsApi = RatingsApi();
+  final MeetupApi _meetupApi = MeetupApi();
   bool _submitting = false;
+  bool _loadingMembers = true;
+  String? _membersError;
 
   @override
   void initState() {
@@ -62,6 +67,52 @@ class _RatePageState extends State<RatePage> {
           ),
         )
         .toList();
+    _loadParticipants();
+  }
+
+  Future<void> _loadParticipants() async {
+    final meetupId = widget.meetupId.trim();
+    if (meetupId.isEmpty) {
+      setState(() {
+        _loadingMembers = false;
+        _membersError = 'This rating screen is missing its meetup ID.';
+      });
+      return;
+    }
+    setState(() {
+      _loadingMembers = true;
+      _membersError = null;
+    });
+    try {
+      final participants = await _meetupApi.participants(meetupId);
+      final currentUserId = AuthSession.currentUserId;
+      final rateable = participants
+          .where(
+            (participant) =>
+                participant.userId != currentUserId && participant.isActive,
+          )
+          .toList();
+      final profiles = await Future.wait(
+        rateable.map(
+          (participant) => _meetupApi.anonymousProfile(participant.userId),
+        ),
+      );
+      if (!mounted) return;
+      setState(() {
+        _members = List.generate(
+          rateable.length,
+          (index) => MemberRating(
+            userId: rateable[index].userId,
+            name: profiles[index].name,
+            isChecked: false,
+          ),
+        );
+      });
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _membersError = error.message);
+    } finally {
+      if (mounted) setState(() => _loadingMembers = false);
+    }
   }
 
   void _setRating(int memberIndex, int starIndex) {
@@ -142,6 +193,11 @@ class _RatePageState extends State<RatePage> {
     );
   }
 
+  void _skipRatings() {
+    if (_submitting) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
@@ -153,246 +209,274 @@ class _RatePageState extends State<RatePage> {
     final mediaQuery = MediaQuery.of(context);
     final topPadding = mediaQuery.padding.top;
 
-    return Scaffold(
-      backgroundColor: _kCream,
-      body: Stack(
-        children: [
-          // Ambient bottom lavender wave gradient
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 200,
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [_kCream, Color(0xFFEDE7FA)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: _kCream,
+        body: Stack(
+          children: [
+            // Ambient bottom lavender wave gradient
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 200,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_kCream, Color(0xFFEDE7FA)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Floating Decorative Sparkles
-          Positioned(
-            top: topPadding + 65,
-            left: 20,
-            child: const Text(
-              '✦',
-              style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14),
+            // Floating Decorative Sparkles
+            Positioned(
+              top: topPadding + 65,
+              left: 20,
+              child: const Text(
+                '✦',
+                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14),
+              ),
             ),
-          ),
-          Positioned(
-            top: topPadding + 130,
-            right: 30,
-            child: const Text(
-              '✦',
-              style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16),
+            Positioned(
+              top: topPadding + 130,
+              right: 30,
+              child: const Text(
+                '✦',
+                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16),
+              ),
             ),
-          ),
-          Positioned(
-            bottom: 60,
-            left: 32,
-            child: const Text(
-              '✦',
-              style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14),
+            Positioned(
+              bottom: 60,
+              left: 32,
+              child: const Text(
+                '✦',
+                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14),
+              ),
             ),
-          ),
-          Positioned(
-            bottom: 80,
-            right: 40,
-            child: const Text(
-              '✦',
-              style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16),
+            Positioned(
+              bottom: 80,
+              right: 40,
+              child: const Text(
+                '✦',
+                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16),
+              ),
             ),
-          ),
 
-          SafeArea(
-            child: Column(
-              children: [
-                // -------------------------------------------------------------
-                // TOP BAR: Round Back Button (Left), User Avatar (Right)
-                // -------------------------------------------------------------
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Back Button (Round White Pill)
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context),
-                        child: Container(
-                          width: 48,
-                          height: 48,
+            SafeArea(
+              child: Column(
+                children: [
+                  // -------------------------------------------------------------
+                  // TOP BAR: Round Back Button (Left), User Avatar (Right)
+                  // -------------------------------------------------------------
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        // User Avatar on Right
+                        Container(
+                          width: 52,
+                          height: 52,
                           decoration: BoxDecoration(
-                            color: Colors.white,
                             shape: BoxShape.circle,
+                            color: const Color(0xFF5A3825).withOpacity(0.15),
+                            border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.06),
+                                color: Colors.black.withOpacity(0.08),
                                 blurRadius: 10,
-                                offset: const Offset(0, 3),
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
                           child: const Icon(
-                            Icons.arrow_back,
-                            color: _kPurpleDark,
-                            size: 24,
+                            Icons.person,
+                            color: _kPurple,
+                            size: 28,
                           ),
                         ),
-                      ),
-
-                      // User Avatar on Right
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF5A3825).withOpacity(0.15),
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: Text('👩🏽', style: TextStyle(fontSize: 26)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 14),
-
-                // -------------------------------------------------------------
-                // TITLE & SUBTITLE
-                // -------------------------------------------------------------
-                const Text(
-                  'Rate the Meetup!',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: _kPurpleDark,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'How was your ${widget.meetupType}?',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFF7E7993),
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                // -------------------------------------------------------------
-                // RATING CARDS LIST
-                // -------------------------------------------------------------
-                Expanded(
-                  child: _members.isEmpty
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Text(
-                              'No participants are available to rate.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Color(0xFF7E7993)),
-                            ),
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: _members.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 16),
-                          itemBuilder: (context, index) {
-                            final member = _members[index];
-                            return _buildRatingCard(index, member);
-                          },
-                        ),
-                ),
-
-                // -------------------------------------------------------------
-                // BOTTOM SUBMIT BUTTON
-                // -------------------------------------------------------------
-                Padding(
-                  padding: EdgeInsets.only(
-                    left: 24,
-                    right: 24,
-                    top: 10,
-                    bottom: mediaQuery.padding.bottom > 0
-                        ? mediaQuery.padding.bottom + 8
-                        : 20,
-                  ),
-                  child: GestureDetector(
-                    onTap: _submitting ? null : _submitRatings,
-                    child: Container(
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF6C3EE8), Color(0xFF8E45FF)],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6C3EE8).withOpacity(0.4),
-                            blurRadius: 16,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_submitting)
-                            const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          else
-                            const Icon(
-                              Icons.check_circle_outline_rounded,
-                              color: Colors.white,
-                              size: 22,
-                            ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _submitting ? 'Submitting...' : 'Submit Ratings ✨',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.1,
-                            ),
-                          ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+
+                  const SizedBox(height: 14),
+
+                  // -------------------------------------------------------------
+                  // TITLE & SUBTITLE
+                  // -------------------------------------------------------------
+                  const Text(
+                    'Rate the Meetup!',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      color: _kPurpleDark,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'How was your ${widget.meetupType}?',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF7E7993),
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // -------------------------------------------------------------
+                  // RATING CARDS LIST
+                  // -------------------------------------------------------------
+                  Expanded(
+                    child: _loadingMembers
+                        ? const Center(child: CircularProgressIndicator())
+                        : _membersError != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(32),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _membersError!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Color(0xFF7E7993),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: _loadParticipants,
+                                    child: const Text('Try again'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        : _members.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(32),
+                              child: Text(
+                                'No participants are available to rate.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Color(0xFF7E7993)),
+                              ),
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            itemCount: _members.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 16),
+                            itemBuilder: (context, index) {
+                              final member = _members[index];
+                              return _buildRatingCard(index, member);
+                            },
+                          ),
+                  ),
+
+                  // -------------------------------------------------------------
+                  // BOTTOM SUBMIT BUTTON
+                  // -------------------------------------------------------------
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: 24,
+                      right: 24,
+                      top: 10,
+                      bottom: mediaQuery.padding.bottom > 0
+                          ? mediaQuery.padding.bottom + 8
+                          : 20,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        GestureDetector(
+                          onTap: _submitting || _loadingMembers
+                              ? null
+                              : _submitRatings,
+                          child: Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF6C3EE8), Color(0xFF8E45FF)],
+                                begin: Alignment.centerLeft,
+                                end: Alignment.centerRight,
+                              ),
+                              borderRadius: BorderRadius.circular(28),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF6C3EE8,
+                                  ).withOpacity(0.4),
+                                  blurRadius: 16,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (_submitting)
+                                  const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                else
+                                  const Icon(
+                                    Icons.check_circle_outline_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _submitting
+                                      ? 'Submitting...'
+                                      : 'Submit Ratings ✨',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.1,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        TextButton(
+                          onPressed: _submitting ? null : _skipRatings,
+                          child: const Text(
+                            'Skip for now',
+                            style: TextStyle(
+                              color: _kPurple,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
