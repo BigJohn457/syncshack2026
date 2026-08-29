@@ -929,7 +929,7 @@ class _HomePageState extends State<HomePage> {
             ),
             SizedBox(width: 9),
             Text(
-              'New Meetup Request',
+              'Request',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 15,
