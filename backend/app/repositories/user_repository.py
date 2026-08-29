@@ -27,7 +27,7 @@ class UserRepository:
                     phone,
                     radius,
                     profile_image_url
-                    , personalization_answers, matchmaking
+                    , details AS personalization_answers, matchmaking
                 FROM users
                 WHERE id = %s
                 LIMIT 1
@@ -66,7 +66,7 @@ class UserRepository:
                     last_name,
                     profile_image_url,
                     reliability_score
-                    , personalization_answers
+                    , details AS personalization_answers
                 FROM users
                 WHERE id = %s
                 LIMIT 1
@@ -178,7 +178,7 @@ class UserRepository:
         try:
             cursor.execute(
                 """
-                UPDATE users SET personalization_answers = %s
+                UPDATE users SET details = %s
                 WHERE id = %s
                 """,
                 (json.dumps(answers), user_id),
@@ -221,7 +221,8 @@ class UserRepository:
             cursor.execute(
                 f"""
                 SELECT id, first_name, last_name, radius,
-                       reliability_score, personalization_answers
+                       reliability_score,
+                       details AS personalization_answers
                 FROM users WHERE id IN ({placeholders})
                 """,
                 tuple(user_ids),

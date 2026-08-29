@@ -598,75 +598,97 @@ class _HomePageState extends State<HomePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GestureDetector(
-              onTap: _showProfileSheet,
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFFF3F4FD),
-                  border: Border.all(
-                    color: const Color(0xFF7C4DFF).withOpacity(0.35),
-                    width: 3.5,
+        Expanded(
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: _showProfileSheet,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFF3F4FD),
+                    border: Border.all(
+                      color: const Color(0xFF7C4DFF).withOpacity(0.35),
+                      width: 3.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF7C4DFF).withOpacity(0.2),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF7C4DFF).withOpacity(0.2),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(2.5),
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF6C3EE8),
-                    ),
-                    child: const Icon(
-                      Icons.person,
-                      color: Colors.white,
-                      size: 28,
+                  child: Padding(
+                    padding: const EdgeInsets.all(2.5),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Color(0xFF6C3EE8),
+                      ),
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            if (_profileQuestionsRequired) ...[
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () async {
-                  final saved = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ProfileQuestionsPage(),
+              if (_profileQuestionsRequired) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      alignment: Alignment.centerLeft,
                     ),
-                  );
-                  if (saved == true) await _loadProfileSummary();
-                },
-                child: const Text('Answer required questions?'),
-              ),
+                    onPressed: () async {
+                      final saved = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ProfileQuestionsPage(),
+                        ),
+                      );
+                      if (saved == true) await _loadProfileSummary();
+                    },
+                    child: const Text(
+                      'Answer required questions?',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
 
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Switch(
-                  value: _matchmakingEnabled,
-                  onChanged: _setMatchmakingEnabled,
-                ),
-                const Text('Matchmaking', style: TextStyle(fontSize: 10)),
-              ],
+            SizedBox(
+              width: 48,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 40,
+                    height: 30,
+                    child: FittedBox(
+                      fit: BoxFit.contain,
+                      child: Switch(
+                        value: _matchmakingEnabled,
+                        onChanged: _setMatchmakingEnabled,
+                      ),
+                    ),
+                  ),
+                  const Text('Match', style: TextStyle(fontSize: 9)),
+                ],
+              ),
             ),
             GestureDetector(
               onTap: _showNotificationsSheet,
@@ -674,8 +696,8 @@ class _HomePageState extends State<HomePage> {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     alignment: Alignment.center,
                     child: const Icon(
                       Icons.notifications_none_rounded,
