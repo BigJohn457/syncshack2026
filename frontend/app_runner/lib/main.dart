@@ -17,6 +17,7 @@ import 'meetups/meetup_api.dart';
 import 'profiles/profile_api.dart';
 import 'requests/nearby_requests_api.dart';
 import 'requests/active_request_store.dart';
+import 'requests/meetup_requests_api.dart';
 import 'searching.dart';
 import 'settings.dart';
 
@@ -61,6 +62,7 @@ class _HomePageState extends State<HomePage> {
   // Map Controller for interactive moving/zooming
   final MapController _mapController = MapController();
   final NearbyRequestsApi _nearbyRequestsApi = NearbyRequestsApi();
+  final MeetupRequestsApi _meetupRequestsApi = MeetupRequestsApi();
   final MeetupApi _meetupApi = MeetupApi();
   String? _joiningRequestId;
   static const LatLng _fallbackCenter = LatLng(-33.8688, 151.2093);
@@ -1180,18 +1182,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _acceptInvitation(MapPinData pin) async {
-    final meetupId = pin.meetupId?.trim() ?? '';
-    if (meetupId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This request does not have an invitation yet.'),
-        ),
-      );
-      return;
-    }
     setState(() => _joiningRequestId = pin.id);
     try {
-      await _meetupApi.acceptInvitation(meetupId);
+      final joined = await _meetupRequestsApi.join(pin.id);
+      if (joined.invitationStatus != 'accepted') {
+        await _meetupApi.acceptInvitation(joined.meetupId);
+      }
       if (!mounted) return;
       Navigator.pop(context);
       Navigator.push(
@@ -1200,12 +1196,13 @@ class _HomePageState extends State<HomePage> {
           builder: (_) => ChatPage(
             activity: pin.title.replaceAll('\n', ' '),
             place: pin.category,
-            meetupId: meetupId,
+            meetupId: joined.meetupId,
           ),
         ),
       );
     } on AuthException catch (error) {
       if (mounted) {
+        Navigator.pop(context);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(error.message)));

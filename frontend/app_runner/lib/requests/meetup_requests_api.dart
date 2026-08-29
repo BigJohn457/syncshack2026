@@ -36,11 +36,65 @@ class MeetupRequestStatus {
   }
 }
 
+class JoinedMeetupRequest {
+  const JoinedMeetupRequest({
+    required this.requestId,
+    required this.meetupId,
+    required this.invitationStatus,
+  });
+
+  final String requestId;
+  final String meetupId;
+  final String invitationStatus;
+}
+
 class MeetupRequestsApi {
   MeetupRequestsApi({http.Client? client})
     : _client = client ?? createHttpClient();
 
   final http.Client _client;
+
+  Future<JoinedMeetupRequest> join(String requestId) async {
+    http.Response response;
+    try {
+      response = await _client.post(
+        ApiConfig.uri('/api/request/post/join-request'),
+        headers: const {'Content-Type': 'application/json'},
+        body: jsonEncode({'request_id': requestId.trim()}),
+      );
+    } on Exception {
+      throw const AuthException(
+        'Could not join the meetup. Check your internet connection.',
+      );
+    }
+
+    Map<String, dynamic> payload = const {};
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) payload = decoded;
+    } on FormatException {
+      // Use the status fallback below for malformed server responses.
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw AuthException(
+        payload['error']?.toString() ??
+            'Could not join the meetup (${response.statusCode}).',
+      );
+    }
+    final data = payload['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const AuthException('The server returned an invalid meetup.');
+    }
+    final meetupId = data['meetup_id']?.toString() ?? '';
+    if (meetupId.isEmpty) {
+      throw const AuthException('The server did not return a meetup ID.');
+    }
+    return JoinedMeetupRequest(
+      requestId: data['request_id']?.toString() ?? requestId,
+      meetupId: meetupId,
+      invitationStatus: data['invitation_status']?.toString() ?? 'pending',
+    );
+  }
 
   Future<MeetupRequestStatus> status(String requestId) async {
     http.Response response;

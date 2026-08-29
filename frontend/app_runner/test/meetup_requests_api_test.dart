@@ -7,6 +7,31 @@ import 'package:http/testing.dart';
 import 'package:latlong2/latlong.dart';
 
 void main() {
+  test('joins a nearby request and receives the meetup ID', () async {
+    late http.Request captured;
+    final client = MockClient((request) async {
+      captured = request;
+      return http.Response(
+        jsonEncode({
+          'success': true,
+          'data': {
+            'request_id': 'request-1',
+            'meetup_id': 'meetup-1',
+            'invitation_status': 'pending',
+          },
+        }),
+        201,
+      );
+    });
+
+    final joined = await MeetupRequestsApi(client: client).join('request-1');
+
+    expect(captured.url.path, '/api/request/post/join-request');
+    expect(jsonDecode(captured.body), {'request_id': 'request-1'});
+    expect(joined.meetupId, 'meetup-1');
+    expect(joined.invitationStatus, 'pending');
+  });
+
   test('fetches creator request status for waiting-page polling', () async {
     late http.Request captured;
     final client = MockClient((request) async {
