@@ -11,7 +11,10 @@ import 'auth/auth_api.dart';
 import 'chat.dart';
 import 'datetime.dart';
 import 'edit_profile.dart';
+import 'map_style.dart';
 import 'requests/nearby_requests_api.dart';
+import 'requests/active_request_store.dart';
+import 'searching.dart';
 import 'settings.dart';
 
 void main() {
@@ -59,12 +62,13 @@ class _HomePageState extends State<HomePage> {
   static const double _defaultRadiusKm = 2;
   static const double _defaultZoom = 14.5;
   LatLng? _userLocation;
+  LatLng? _searchCenter;
   double _radiusKm = _defaultRadiusKm;
-  double _lastZoom = _defaultZoom;
   bool _mapReady = false;
   bool _loadingRequests = false;
   String? _mapError;
   Timer? _zoomDebounce;
+  int _requestGeneration = 0;
 
   // Match Cards Data
   final List<Map<String, dynamic>> _matchCards = [
@@ -138,6 +142,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) return;
       setState(() {
         _userLocation = location;
+        _searchCenter = location;
         _mapError = null;
       });
       if (_mapReady) _mapController.move(location, _defaultZoom);
@@ -153,24 +158,31 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _fetchNearbyRequests() async {
-    final location = _userLocation;
-    if (location == null) return;
+  Future<void> _fetchNearbyRequests({LatLng? center, double? radiusKm}) async {
+    final searchCenter = center ?? _searchCenter ?? _userLocation;
+    if (searchCenter == null) return;
+    final searchRadius = radiusKm ?? _radiusKm;
+    final generation = ++_requestGeneration;
     setState(() {
       _loadingRequests = true;
       _mapError = null;
+      _searchCenter = searchCenter;
+      _radiusKm = searchRadius;
     });
     try {
       final requests = await _nearbyRequestsApi.fetch(
-        latitude: location.latitude,
-        longitude: location.longitude,
-        radiusKm: _radiusKm,
+        latitude: searchCenter.latitude,
+        longitude: searchCenter.longitude,
+        radiusKm: searchRadius,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _requestGeneration) return;
       const distance = Distance();
       setState(() {
         _pins = requests.map((request) {
-          final metres = distance(location, request.location);
+          final metres = distance(
+            _userLocation ?? searchCenter,
+            request.location,
+          );
           return MapPinData(
             id: request.id,
             title: request.title,
@@ -185,9 +197,13 @@ class _HomePageState extends State<HomePage> {
         }).toList();
       });
     } on AuthException catch (error) {
-      if (mounted) setState(() => _mapError = error.message);
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _mapError = error.message);
+      }
     } finally {
-      if (mounted) setState(() => _loadingRequests = false);
+      if (mounted && generation == _requestGeneration) {
+        setState(() => _loadingRequests = false);
+      }
     }
   }
 
@@ -202,18 +218,21 @@ class _HomePageState extends State<HomePage> {
     return '$hour:$minute $suffix';
   }
 
-  void _onMapPositionChanged(MapCamera camera, bool hasGesture) {
-    if (!hasGesture || (camera.zoom - _lastZoom).abs() < 0.05) return;
-    _lastZoom = camera.zoom;
+  void _onMapPositionChanged(MapCamera camera, bool _) {
     _zoomDebounce?.cancel();
-    _zoomDebounce = Timer(const Duration(milliseconds: 500), () {
-      final newRadius =
-          (_defaultRadiusKm * math.pow(2, _defaultZoom - camera.zoom))
-              .clamp(0.1, 50.0)
-              .toDouble();
-      if ((newRadius - _radiusKm).abs() < 0.05) return;
-      setState(() => _radiusKm = newRadius);
-      _fetchNearbyRequests();
+    _zoomDebounce = Timer(const Duration(milliseconds: 350), () {
+      const distance = Distance();
+      final bounds = camera.visibleBounds;
+      final radiusKm =
+          math.max(
+            distance(camera.center, bounds.northEast),
+            distance(camera.center, bounds.southWest),
+          ) /
+          1000;
+      _fetchNearbyRequests(
+        center: camera.center,
+        radiusKm: radiusKm.clamp(0.1, 50).toDouble(),
+      );
     });
   }
 
@@ -300,13 +319,17 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     children: [
-                      // CartoDB Voyager Map Tiles (Pastel clean light theme)
+                      // OpenStreetMap standard tiles require no API key.
                       TileLayer(
                         urlTemplate:
-                            'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-                        fallbackUrl:
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.syncshack.meetupapp',
+                        tileBuilder: heyPastelTileBuilder,
+                      ),
+                      const RichAttributionWidget(
+                        attributions: [
+                          TextSourceAttribution('OpenStreetMap contributors'),
+                        ],
                       ),
 
                       // Interactive Live GPS Pins Layer
@@ -839,10 +862,12 @@ class _HomePageState extends State<HomePage> {
         }
         _mapController.move(_userLocation!, _defaultZoom);
         setState(() {
-          _lastZoom = _defaultZoom;
           _radiusKm = _defaultRadiusKm;
         });
-        await _fetchNearbyRequests();
+        await _fetchNearbyRequests(
+          center: _userLocation,
+          radiusKm: _defaultRadiusKm,
+        );
         if (mounted) _showGpsFeedback();
       },
       child: Container(
@@ -875,11 +900,29 @@ class _HomePageState extends State<HomePage> {
   // -------------------------------------------------------------
   Widget _buildNewMeetupButton() {
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
+        final activeRequest = await ActiveRequestStore.load();
+        if (!mounted) return;
+        if (activeRequest != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => activeRequest.isFull
+                  ? ChatPage(
+                      activity: activeRequest.activity,
+                      place: activeRequest.place,
+                      meetupId: activeRequest.meetupId,
+                    )
+                  : SearchingPage.fromRequest(activeRequest),
+            ),
+          );
+          return;
+        }
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => DateTimeSetupPage(
+              initialLocation: _userLocation,
               onBack: () => Navigator.pop(context),
               onRequestMeetup: (activity, people, place, hour, minute, isAm) {
                 Navigator.pop(context);
@@ -1357,7 +1400,10 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 12),
               Text(
                 _userName,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               Text(
                 'Active Status: $_userStatus',

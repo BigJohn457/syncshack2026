@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 import 'datetime.dart';
+import 'map_style.dart';
 
 void main() {
   runApp(const MyApp());
@@ -41,7 +42,10 @@ class _HomePageState extends State<HomePage> {
 
   // Map Controller for interactive moving/zooming
   final MapController _mapController = MapController();
-  final LatLng _initialCenter = const LatLng(-33.8688, 151.2093); // Sydney CBD & Harbor
+  final LatLng _initialCenter = const LatLng(
+    -33.8688,
+    151.2093,
+  ); // Sydney CBD & Harbor
 
   // Match Cards Data
   final List<Map<String, dynamic>> _matchCards = [
@@ -53,7 +57,8 @@ class _HomePageState extends State<HomePage> {
       'emoji': '☕',
       'person': 'Alex Rivera',
       'place': 'Single O / Surry Hills',
-      'bio': 'Taking a study break near Central, would love a flat white and quick chat!'
+      'bio':
+          'Taking a study break near Central, would love a flat white and quick chat!',
     },
     {
       'title': 'Afternoon Walk 🚶',
@@ -63,7 +68,8 @@ class _HomePageState extends State<HomePage> {
       'emoji': '🚶',
       'person': 'Jordan Lee',
       'place': 'Barangaroo Foreshore',
-      'bio': 'Enjoying the Sydney sunshine. Down for a 20-minute walk by the water.'
+      'bio':
+          'Enjoying the Sydney sunshine. Down for a 20-minute walk by the water.',
     },
   ];
 
@@ -82,7 +88,8 @@ class _HomePageState extends State<HomePage> {
         category: 'Coffee',
         author: 'Elena R.',
         distance: '0.4 km away',
-        description: 'Working at a cafe near Circular Quay, free for the next hour to grab a flat white!',
+        description:
+            'Working at a cafe near Circular Quay, free for the next hour to grab a flat white!',
       ),
       const MapPinData(
         id: 'pin_2',
@@ -92,7 +99,8 @@ class _HomePageState extends State<HomePage> {
         category: 'Walk',
         author: 'Marcus K.',
         distance: '0.3 km away',
-        description: 'Walking along the Botanic Garden harbor path towards Mrs Macquarie Chair. Join in!',
+        description:
+            'Walking along the Botanic Garden harbor path towards Mrs Macquarie Chair. Join in!',
       ),
       const MapPinData(
         id: 'pin_3',
@@ -102,7 +110,8 @@ class _HomePageState extends State<HomePage> {
         category: 'Food',
         author: 'Sophie T.',
         distance: '0.8 km away',
-        description: 'Heading to a bakery in Surry Hills on Crown St. Craving croissants & iced matcha!',
+        description:
+            'Heading to a bakery in Surry Hills on Crown St. Craving croissants & iced matcha!',
       ),
       const MapPinData(
         id: 'pin_4',
@@ -112,7 +121,8 @@ class _HomePageState extends State<HomePage> {
         category: 'Social',
         author: 'David L.',
         distance: '0.5 km away',
-        description: 'Chilling at Darling Quarter! Up for bowling, bubble tea, or gaming.',
+        description:
+            'Chilling at Darling Quarter! Up for bowling, bubble tea, or gaming.',
       ),
       const MapPinData(
         id: 'pin_5',
@@ -122,7 +132,8 @@ class _HomePageState extends State<HomePage> {
         category: 'Explore',
         author: 'Chloe M.',
         distance: '0.9 km away',
-        description: 'Walking across the Sydney Harbour Bridge! Looking for company to enjoy the views.',
+        description:
+            'Walking across the Sydney Harbour Bridge! Looking for company to enjoy the views.',
       ),
     ];
   }
@@ -202,13 +213,17 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     children: [
-                      // CartoDB Voyager Map Tiles (Pastel clean light theme)
+                      // OpenStreetMap standard tiles require no API key.
                       TileLayer(
                         urlTemplate:
-                            'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-                        fallbackUrl:
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.syncshack.meetupapp',
+                        tileBuilder: heyPastelTileBuilder,
+                      ),
+                      const RichAttributionWidget(
+                        attributions: [
+                          TextSourceAttribution('OpenStreetMap contributors'),
+                        ],
                       ),
 
                       // Interactive Live GPS Pins Layer
@@ -239,18 +254,10 @@ class _HomePageState extends State<HomePage> {
                 ),
 
                 // Top-Left: "4 requests on the map" Dropdown Pill
-                Positioned(
-                  top: 14,
-                  left: 16,
-                  child: _buildRequestsPill(),
-                ),
+                Positioned(top: 14, left: 16, child: _buildRequestsPill()),
 
                 // Top-Right: GPS Location Target Button (Smooth camera centering)
-                Positioned(
-                  top: 14,
-                  right: 16,
-                  child: _buildGpsButton(),
-                ),
+                Positioned(top: 14, right: 16, child: _buildGpsButton()),
 
                 // Bottom Floating Action Button: "New Meetup Request" -> Goes to datetime.dart
                 Positioned(
@@ -259,9 +266,7 @@ class _HomePageState extends State<HomePage> {
                   bottom: mediaQuery.padding.bottom > 0
                       ? mediaQuery.padding.bottom + 12
                       : 28,
-                  child: Center(
-                    child: _buildNewMeetupButton(),
-                  ),
+                  child: Center(child: _buildNewMeetupButton()),
                 ),
               ],
             ),
@@ -305,11 +310,7 @@ class _HomePageState extends State<HomePage> {
                   shape: BoxShape.circle,
                   color: Color(0xFF6C3EE8),
                 ),
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 28,
-                ),
+                child: const Icon(Icons.person, color: Colors.white, size: 28),
               ),
             ),
           ),
@@ -359,11 +360,7 @@ class _HomePageState extends State<HomePage> {
       children: [
         Row(
           children: const [
-            Icon(
-              Icons.auto_awesome,
-              color: Color(0xFF6C3EE8),
-              size: 20,
-            ),
+            Icon(Icons.auto_awesome, color: Color(0xFF6C3EE8), size: 20),
             SizedBox(width: 8),
             Text(
               'Your top match',
@@ -501,10 +498,7 @@ class _HomePageState extends State<HomePage> {
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF6836E6),
-                      Color(0xFF9854FF),
-                    ],
+                    colors: [Color(0xFF6836E6), Color(0xFF9854FF)],
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                   ),
@@ -575,14 +569,11 @@ class _HomePageState extends State<HomePage> {
                         color: Colors.black.withOpacity(0.12),
                         blurRadius: 4,
                         offset: const Offset(0, 2),
-                      )
+                      ),
                     ],
                   ),
                   child: Center(
-                    child: Text(
-                      emoji,
-                      style: const TextStyle(fontSize: 18),
-                    ),
+                    child: Text(emoji, style: const TextStyle(fontSize: 18)),
                   ),
                 ),
               ),
@@ -592,12 +583,18 @@ class _HomePageState extends State<HomePage> {
         const Positioned(
           top: 2,
           right: 0,
-          child: Text('✦', style: TextStyle(color: Color(0xFF9F75FF), fontSize: 10)),
+          child: Text(
+            '✦',
+            style: TextStyle(color: Color(0xFF9F75FF), fontSize: 10),
+          ),
         ),
         const Positioned(
           bottom: 2,
           left: 0,
-          child: Text('✦', style: TextStyle(color: Color(0xFF9F75FF), fontSize: 10)),
+          child: Text(
+            '✦',
+            style: TextStyle(color: Color(0xFF9F75FF), fontSize: 10),
+          ),
         ),
       ],
     );
@@ -653,11 +650,7 @@ class _HomePageState extends State<HomePage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [
-            Icon(
-              Icons.people_alt_rounded,
-              color: Color(0xFF6C3EE8),
-              size: 17,
-            ),
+            Icon(Icons.people_alt_rounded, color: Color(0xFF6C3EE8), size: 17),
             SizedBox(width: 6),
             Text(
               '4 requests on the map',
@@ -748,10 +741,7 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.symmetric(horizontal: 26),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [
-              Color(0xFF5A25E6),
-              Color(0xFF8E45FF),
-            ],
+            colors: [Color(0xFF5A25E6), Color(0xFF8E45FF)],
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
@@ -859,18 +849,35 @@ class _HomePageState extends State<HomePage> {
                 ),
                 child: Text(
                   match['bio'],
-                  style: const TextStyle(color: Color(0xFF4A4960), fontSize: 13.5, height: 1.4),
+                  style: const TextStyle(
+                    color: Color(0xFF4A4960),
+                    fontSize: 13.5,
+                    height: 1.4,
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
 
               Row(
                 children: [
-                  const Icon(Icons.location_on, size: 16, color: Color(0xFF6C3EE8)),
+                  const Icon(
+                    Icons.location_on,
+                    size: 16,
+                    color: Color(0xFF6C3EE8),
+                  ),
                   const SizedBox(width: 4),
-                  Text(match['place'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text(
+                    match['place'],
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
                   const Spacer(),
-                  Text(match['distance'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(
+                    match['distance'],
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
                 ],
               ),
               const SizedBox(height: 22),
@@ -882,9 +889,14 @@ class _HomePageState extends State<HomePage> {
                       onPressed: () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                       ),
-                      child: const Text('Pass', style: TextStyle(color: Colors.grey)),
+                      child: const Text(
+                        'Pass',
+                        style: TextStyle(color: Colors.grey),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -895,7 +907,9 @@ class _HomePageState extends State<HomePage> {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Connected with ${match['person']}! ☕'),
+                            content: Text(
+                              'Connected with ${match['person']}! ☕',
+                            ),
                             backgroundColor: const Color(0xFF6C3EE8),
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -905,13 +919,18 @@ class _HomePageState extends State<HomePage> {
                         backgroundColor: const Color(0xFF6C3EE8),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
                       ),
-                      child: const Text('Accept & Say Hi 👋', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'Accept & Say Hi 👋',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
-              )
+              ),
             ],
           ),
         );
@@ -951,17 +970,28 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Text(
                     pin.title.replaceAll('\n', ' '),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1E1B2E)),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E1B2E),
+                    ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEFF1FE),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       pin.time,
-                      style: const TextStyle(color: Color(0xFF6C3EE8), fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Color(0xFF6C3EE8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -975,7 +1005,11 @@ class _HomePageState extends State<HomePage> {
 
               Text(
                 pin.description,
-                style: const TextStyle(color: Color(0xFF333344), fontSize: 14, height: 1.4),
+                style: const TextStyle(
+                  color: Color(0xFF333344),
+                  fontSize: 14,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 20),
 
@@ -996,9 +1030,17 @@ class _HomePageState extends State<HomePage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6C3EE8),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
                   ),
-                  child: const Text('Join This Meetup 🚀', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+                  child: const Text(
+                    'Join This Meetup 🚀',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.5,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1036,33 +1078,55 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               const Text(
                 'Active Requests on the Map',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1E1B2E)),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF1E1B2E),
+                ),
               ),
               const SizedBox(height: 12),
 
-              ..._pins.map((p) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEFF1FE),
-                    shape: BoxShape.circle,
+              ..._pins.map(
+                (p) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEFF1FE),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.location_on,
+                      color: Color(0xFF6C3EE8),
+                      size: 20,
+                    ),
                   ),
-                  child: const Icon(Icons.location_on, color: Color(0xFF6C3EE8), size: 20),
+                  title: Text(
+                    p.title.replaceAll('\n', ' '),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${p.author} • ${p.time} (${p.distance})',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right,
+                    color: Color(0xFF6C3EE8),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _selectedPinId = p.id;
+                    });
+                    _mapController.move(p.location, 15.5);
+                    _showPinDetailSheet(p);
+                  },
                 ),
-                title: Text(p.title.replaceAll('\n', ' '), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                subtitle: Text('${p.author} • ${p.time} (${p.distance})', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                trailing: const Icon(Icons.chevron_right, color: Color(0xFF6C3EE8)),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    _selectedPinId = p.id;
-                  });
-                  _mapController.move(p.location, 15.5);
-                  _showPinDetailSheet(p);
-                },
-              )),
+              ),
             ],
           ),
         );
@@ -1127,7 +1191,10 @@ class _HomePageState extends State<HomePage> {
                 'John Ng',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-              const Text('Active Status: Open for coffee ☕', style: TextStyle(color: Color(0xFF6C3EE8), fontSize: 13)),
+              const Text(
+                'Active Status: Open for coffee ☕',
+                style: TextStyle(color: Color(0xFF6C3EE8), fontSize: 13),
+              ),
               const SizedBox(height: 20),
               ListTile(
                 leading: const Icon(Icons.edit, color: Color(0xFF6C3EE8)),
@@ -1277,14 +1344,18 @@ class _MapPinWidget extends StatelessWidget {
                     Icon(
                       Icons.access_time_rounded,
                       size: 11,
-                      color: isSelected ? Colors.white.withOpacity(0.85) : const Color(0xFF6C3EE8),
+                      color: isSelected
+                          ? Colors.white.withOpacity(0.85)
+                          : const Color(0xFF6C3EE8),
                     ),
                     const SizedBox(width: 3.5),
                     Text(
                       pinData.time,
                       style: TextStyle(
                         fontSize: 9.5,
-                        color: isSelected ? Colors.white.withOpacity(0.85) : const Color(0xFF6C3EE8),
+                        color: isSelected
+                            ? Colors.white.withOpacity(0.85)
+                            : const Color(0xFF6C3EE8),
                         fontWeight: FontWeight.w600,
                       ),
                     ),

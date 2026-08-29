@@ -4,4 +4,6 @@ import 'http_client_stub.dart'
     if (dart.library.html) 'http_client_web.dart'
     as implementation;
 
-http.Client createHttpClient() => implementation.createHttpClient();
+final http.Client _sharedClient = implementation.createHttpClient();
+
+http.Client createHttpClient() => _sharedClient;

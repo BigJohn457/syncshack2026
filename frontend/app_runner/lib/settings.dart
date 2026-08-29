@@ -166,11 +166,7 @@ class _SettingsToggle extends StatelessWidget {
                   ),
                 ),
               ),
-              Switch(
-                value: value,
-                onChanged: onChanged,
-                activeColor: _kPurple,
-              ),
+              Switch(value: value, onChanged: onChanged, activeColor: _kPurple),
             ],
           ),
         ),

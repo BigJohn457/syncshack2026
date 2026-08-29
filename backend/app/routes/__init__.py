@@ -7,7 +7,18 @@ from .meetup_chat import meetup_chat
 from .rating import rating
 from .request import request
 from .users import users
+from .upload import upload
 
-blueprints = (home, auth, request, meetup_chat, meetup, meetup_api, rating, users)
+blueprints = (
+    home,
+    auth,
+    request,
+    meetup_chat,
+    meetup,
+    meetup_api,
+    rating,
+    users,
+    upload,
+)
 
 __all__ = ["blueprints"]

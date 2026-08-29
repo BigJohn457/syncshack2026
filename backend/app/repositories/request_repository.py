@@ -30,6 +30,14 @@ class RequestNotFoundError(Exception):
     pass
 
 
+class RequestPermissionError(Exception):
+    pass
+
+
+class RequestCancellationError(Exception):
+    pass
+
+
 class RequestRepository:
     def __init__(self, connection_factory: Callable = get_db_connection):
         self.connection_factory = connection_factory
@@ -173,6 +181,74 @@ class RequestRepository:
                 location = json.loads(location)
 
             return {"location": location}
+        finally:
+            cursor.close()
+            connection.close()
+
+    def cancel(self, request_id: str, user_id: str) -> dict[str, str]:
+        connection = self.connection_factory()
+        cursor = connection.cursor(dictionary=True)
+
+        try:
+            cursor.execute(
+                """
+                SELECT
+                    r.creator_id,
+                    r.status AS request_status,
+                    m.meetup_id,
+                    m.status AS meetup_status
+                FROM requests AS r
+                LEFT JOIN meetups AS m ON m.request_id = r.request_id
+                WHERE r.request_id = %s
+                LIMIT 1
+                FOR UPDATE
+                """,
+                (request_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise RequestNotFoundError(request_id)
+            if row["creator_id"] != user_id:
+                raise RequestPermissionError()
+            if row["request_status"] in {"cancelled", "expired"}:
+                raise RequestCancellationError(
+                    f"request is already {row['request_status']}"
+                )
+            if row["meetup_status"] == "completed":
+                raise RequestCancellationError("completed meetup cannot be cancelled")
+
+            cursor.execute(
+                "UPDATE requests SET status = 'cancelled' WHERE request_id = %s",
+                (request_id,),
+            )
+            cursor.execute(
+                """
+                UPDATE request_participants
+                SET status = 'cancelled'
+                WHERE request_id = %s AND status IN ('pending', 'accepted')
+                """,
+                (request_id,),
+            )
+
+            if row["meetup_id"] is not None:
+                cursor.execute(
+                    "UPDATE meetups SET status = 'cancelled' WHERE meetup_id = %s",
+                    (row["meetup_id"],),
+                )
+                cursor.execute(
+                    """
+                    UPDATE meetup_participants
+                    SET attendance_status = 'cancelled'
+                    WHERE meetup_id = %s AND attendance_status = 'joined'
+                    """,
+                    (row["meetup_id"],),
+                )
+
+            connection.commit()
+            return {"request_id": request_id, "status": "cancelled"}
+        except Exception:
+            connection.rollback()
+            raise
         finally:
             cursor.close()
             connection.close()

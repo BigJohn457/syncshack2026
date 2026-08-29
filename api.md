@@ -92,6 +92,57 @@ empty or longer than 36 characters.
 
 ---
 
+## Image uploads
+
+### Upload a picture
+
+```http
+POST /api/upload/post/picture
+Content-Type: multipart/form-data
+```
+
+Uploads one validated image to DigitalOcean Spaces under `personal/hey/` and
+returns its public URL. This endpoint can be used before signup, so it does not
+require a login session.
+
+Multipart form fields:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `picture` | file | Yes | JPEG, PNG, WEBP, or GIF; maximum 10 MB |
+
+Do not manually set the multipart `Content-Type` header in browser code; the
+browser must add its boundary.
+
+```js
+const form = new FormData();
+form.append("picture", selectedFile);
+
+const response = await fetch(`${API_BASE_URL}/api/upload/post/picture`, {
+  method: "POST",
+  body: form
+});
+const result = await response.json();
+const imageUrl = result.data.url;
+```
+
+Success — `201`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://mg-kopi.syd1.digitaloceanspaces.com/personal/hey/IMAGE_UUID.png",
+    "key": "personal/hey/IMAGE_UUID.png"
+  }
+}
+```
+
+Errors: `400` missing/invalid/oversized image, `502` Spaces upload failure,
+`503` Spaces credentials not configured.
+
+---
+
 ## Authentication
 
 ### Sign up
@@ -196,6 +247,50 @@ Success — `200`:
 ---
 
 ## Requests
+
+### Cancel a request
+
+```http
+POST /api/request/post/cancel-request
+```
+
+Authentication: session cookie required; `X-User-ID` is a temporary fallback.
+Only the user who created the request can cancel it.
+
+Request body:
+
+```json
+{
+  "request_id": "06b1f081-00c6-4e41-a37d-b9ddd17682a7"
+}
+```
+
+The backend performs these changes in one transaction:
+
+- Sets the request status to `cancelled`.
+- Cancels pending and accepted `request_participants` rows.
+- If a meetup has already been created, sets its status to `cancelled`.
+- Changes joined meetup participants to `cancelled`.
+
+Expired or already cancelled requests cannot be cancelled again. A meetup that
+has already been completed cannot be cancelled.
+
+Success — `200`:
+
+```json
+{
+  "success": true,
+  "message": "Request cancelled successfully",
+  "data": {
+    "request_id": "06b1f081-00c6-4e41-a37d-b9ddd17682a7",
+    "status": "cancelled"
+  }
+}
+```
+
+Errors: `400` invalid input/missing identity, `403` user is not the creator,
+`404` request not found, `409` request or meetup cannot be cancelled, `500`
+database error.
 
 ### Submit a request
 
@@ -447,6 +542,96 @@ not found, `500` database error.
 ---
 
 ## Users and meetup profiles
+
+### Check meetup and request participation
+
+```http
+GET /api/meetup/get/participant-status?meetup_id=meetup-001
+```
+
+Authentication: session cookie required; `X-User-ID` is a temporary fallback.
+The backend checks the logged-in user in both `meetup_participants` and the
+linked request's `request_participants` row.
+
+Success — `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "meetup_id": "meetup-001",
+    "request_id": "request-001",
+    "user_id": "user-123",
+    "meetup_participant": {
+      "exists": true,
+      "attendance_status": "joined",
+      "joined_at": "2026-08-30T09:00:00"
+    },
+    "request_participant": {
+      "exists": true,
+      "status": "accepted",
+      "joined_at": "2026-08-30T08:50:00",
+      "updated_at": "2026-08-30T09:00:00"
+    }
+  }
+}
+```
+
+If the meetup exists but either participant row does not, the endpoint still
+returns `200`; that object's `exists` value is `false` and its status/timestamp
+fields are `null`.
+
+Possible `meetup_participant.attendance_status` values are `joined`, `attended`,
+`no_show`, `left`, and `cancelled`. Possible `request_participant.status` values
+are `pending`, `accepted`, `rejected`, and `cancelled`.
+
+Errors: `400` missing/invalid meetup ID or missing identity, `404` meetup not
+found, `500` database error.
+
+### Accept a meetup invitation
+
+```http
+POST /api/meetup/post/accept-invitation
+```
+
+Authentication: session cookie required; `X-User-ID` is a temporary fallback.
+The authenticated user is the user accepting the invitation.
+
+Request body:
+
+```json
+{
+  "meetup_id": "meetup-001"
+}
+```
+
+The backend performs these changes in one transaction:
+
+1. Finds the meetup and its related request.
+2. Requires a `pending` row for the user in `request_participants`.
+3. Changes the invitation status to `accepted`.
+4. Inserts the user into `meetup_participants` with status `joined` (or updates
+   an existing participant row to `joined`).
+
+Completed or cancelled meetups cannot accept invitations.
+
+Success — `200`:
+
+```json
+{
+  "success": true,
+  "message": "Invitation accepted successfully",
+  "data": {
+    "meetup_id": "meetup-001",
+    "user_id": "user-123",
+    "attendance_status": "joined"
+  }
+}
+```
+
+Errors: `400` invalid input/missing identity, `404` meetup or invitation not
+found, `409` invitation already processed or meetup unavailable, `500` database
+error.
 
 ### Get own profile
 

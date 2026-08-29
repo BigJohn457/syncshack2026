@@ -47,14 +47,20 @@ class _LogInPageState extends State<LogInPage> {
             Positioned(
               top: 40,
               right: 40,
-              child: Icon(Icons.auto_awesome,
-                  color: _kPurple.withOpacity(0.5), size: 20),
+              child: Icon(
+                Icons.auto_awesome,
+                color: _kPurple.withOpacity(0.5),
+                size: 20,
+              ),
             ),
             Positioned(
               top: 76,
               right: 64,
-              child: Icon(Icons.auto_awesome,
-                  color: _kPurple.withOpacity(0.35), size: 12),
+              child: Icon(
+                Icons.auto_awesome,
+                color: _kPurple.withOpacity(0.35),
+                size: 12,
+              ),
             ),
             SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -125,8 +131,10 @@ class _LogInPageState extends State<LogInPage> {
                   _PrimaryButton(
                     label: 'Log In',
                     icon: Icons.arrow_forward_rounded,
-                    onPressed: () => widget.onLogIn
-                        ?.call(_emailController.text, _passwordController.text),
+                    onPressed: () => widget.onLogIn?.call(
+                      _emailController.text,
+                      _passwordController.text,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   _BottomLink(
@@ -296,15 +304,16 @@ class _PrimaryButton extends StatelessWidget {
       height: 60,
       child: ElevatedButton(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-        ).copyWith(
-          backgroundColor: WidgetStateProperty.all(Colors.transparent),
-          shadowColor: WidgetStateProperty.all(Colors.transparent),
-        ),
+        style:
+            ElevatedButton.styleFrom(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ).copyWith(
+              backgroundColor: WidgetStateProperty.all(Colors.transparent),
+              shadowColor: WidgetStateProperty.all(Colors.transparent),
+            ),
         child: Ink(
           decoration: BoxDecoration(
             gradient: const LinearGradient(colors: [_kPurple, _kPurpleDark]),
@@ -318,9 +327,10 @@ class _PrimaryButton extends StatelessWidget {
                 Text(
                   label,
                   style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Icon(icon, color: Colors.white, size: 18),
@@ -338,11 +348,7 @@ class _BottomLink extends StatelessWidget {
   final String action;
   final VoidCallback? onTap;
 
-  const _BottomLink({
-    required this.question,
-    required this.action,
-    this.onTap,
-  });
+  const _BottomLink({required this.question, required this.action, this.onTap});
 
   @override
   Widget build(BuildContext context) {

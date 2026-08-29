@@ -1,4 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'auth/auth_api.dart';
+import 'auth/auth_session.dart';
+import 'chat/meetup_chat_api.dart';
 import 'gp_info.dart';
 
 class ChatPage extends StatefulWidget {
@@ -6,6 +11,7 @@ class ChatPage extends StatefulWidget {
   final String matchAvatar;
   final String activity;
   final String place;
+  final String meetupId;
 
   const ChatPage({
     super.key,
@@ -13,6 +19,7 @@ class ChatPage extends StatefulWidget {
     this.matchAvatar = '',
     this.activity = 'Coffee Meetup',
     this.place = 'Single O / Surry Hills',
+    this.meetupId = '',
   });
 
   @override
@@ -23,124 +30,133 @@ class _ChatPageState extends State<ChatPage> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  late List<ChatMessage> _messages;
+  final MeetupChatApi _chatApi = MeetupChatApi();
+  List<ChatMessage> _messages = const [];
+  Timer? _refreshTimer;
+  bool _loading = true;
+  bool _sending = false;
+  bool _refreshing = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _messages = [
-      ChatMessage(
-        sender: 'Anonymous Koala',
-        text: 'Hey! Are we still meeting at 3:30?',
-        time: '2:45 PM',
-        isMe: false,
-        avatarColor: const Color(0xFF6D3B29),
-        avatarEmoji: '🐨',
-      ),
-      ChatMessage(
-        sender: 'You (Anonymous)',
-        text: "Yep! I'm about 5 mins away ☕",
-        time: '2:46 PM',
-        isMe: true,
-        avatarColor: const Color(0xFF5A3825),
-        avatarEmoji: '🕵️',
-      ),
-      ChatMessage(
-        sender: 'Anonymous Fox',
-        text: 'Perfect, see you there!',
-        time: '2:47 PM',
-        isMe: false,
-        avatarColor: const Color(0xFFE5B869),
-        avatarEmoji: '🦊',
-      ),
-      ChatMessage(
-        sender: 'You (Anonymous)',
-        text: "I'm outside near the entrance 👋",
-        time: '2:49 PM',
-        isMe: true,
-        avatarColor: const Color(0xFF5A3825),
-        avatarEmoji: '🕵️',
-      ),
-      ChatMessage(
-        sender: 'Anonymous Owl',
-        text: 'On my way!',
-        time: '2:50 PM',
-        isMe: false,
-        avatarColor: const Color(0xFF355C3E),
-        avatarEmoji: '🦉',
-      ),
-    ];
+    if (widget.meetupId.trim().isEmpty) {
+      _loading = false;
+      _error = 'This chat is missing its meetup ID.';
+    } else {
+      _loadMessages();
+      _refreshTimer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => _loadMessages(silent: true),
+      );
+    }
   }
 
   @override
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
-  void _sendMessage() {
-    final text = _textController.text.trim();
-    if (text.isEmpty) return;
+  Future<void> _loadMessages({bool silent = false}) async {
+    if (_refreshing || widget.meetupId.trim().isEmpty) return;
+    _refreshing = true;
+    if (!silent && mounted) setState(() => _loading = true);
+    try {
+      final messages = await _chatApi.fetchMessages(widget.meetupId.trim());
+      if (!mounted) return;
+      setState(() {
+        _messages = messages.map(_toChatMessage).toList();
+        _error = null;
+      });
+      _scrollToBottom();
+    } on AuthException catch (error) {
+      if (mounted && !silent) setState(() => _error = error.message);
+    } finally {
+      _refreshing = false;
+      if (mounted && !silent) setState(() => _loading = false);
+    }
+  }
 
-    final now = TimeOfDay.now();
-    final hour = now.hourOfPeriod == 0 ? 12 : now.hourOfPeriod;
-    final minute = now.minute.toString().padLeft(2, '0');
-    final period = now.period == DayPeriod.am ? 'AM' : 'PM';
-    final timeStr = '$hour:$minute $period';
+  ChatMessage _toChatMessage(MeetupChatMessage message) {
+    final isMe =
+        message.senderId.isNotEmpty &&
+        message.senderId == AuthSession.currentUserId;
+    return ChatMessage(
+      id: message.id,
+      sender: isMe ? 'You (Anonymous)' : message.senderName,
+      text: message.message,
+      time: _formatTime(message.createdAt),
+      isMe: isMe,
+      avatarColor: _avatarColor(message.senderId),
+      avatarEmoji: isMe ? '🕵️' : '👤',
+      avatarUrl: message.senderImageUrl,
+    );
+  }
 
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          sender: 'You (Anonymous)',
-          text: text,
-          time: timeStr,
-          isMe: true,
-          avatarColor: const Color(0xFF5A3825),
-          avatarEmoji: '🕵️',
-        ),
-      );
-    });
+  String _formatTime(DateTime? value) {
+    if (value == null) return '';
+    final local = value.toLocal();
+    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+    return '$hour:${local.minute.toString().padLeft(2, '0')} '
+        '${local.hour < 12 ? 'AM' : 'PM'}';
+  }
 
-    _textController.clear();
+  Color _avatarColor(String senderId) {
+    const colors = [
+      Color(0xFF6D3B29),
+      Color(0xFFE5B869),
+      Color(0xFF355C3E),
+      Color(0xFF6C3EE8),
+    ];
+    return colors[senderId.hashCode.abs() % colors.length];
+  }
 
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 80,
+          _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
       }
     });
+  }
 
-    // Simulated anonymous group reply
-    Future.delayed(const Duration(milliseconds: 1400), () {
-      if (mounted) {
-        setState(() {
-          _messages.add(
-            ChatMessage(
-              sender: 'Anonymous Koala',
-              text: 'Just grabbed a table near the window! 🪟☕',
-              time: timeStr,
-              isMe: false,
-              avatarColor: const Color(0xFF6D3B29),
-              avatarEmoji: '🐨',
-            ),
-          );
-        });
-
-        Future.delayed(const Duration(milliseconds: 100), () {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent + 80,
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOut,
-            );
-          }
-        });
+  Future<void> _sendMessage() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty || _sending || widget.meetupId.trim().isEmpty) return;
+    setState(() => _sending = true);
+    _textController.clear();
+    try {
+      final sent = await _chatApi.sendMessage(
+        meetupId: widget.meetupId.trim(),
+        message: text,
+      );
+      if (!mounted) return;
+      if (AuthSession.currentUserId == null && sent.senderId.isNotEmpty) {
+        AuthSession.currentUserId = sent.senderId;
       }
-    });
+      setState(() {
+        if (!_messages.any((message) => message.id == sent.id)) {
+          _messages = [..._messages, _toChatMessage(sent)];
+        }
+        _error = null;
+      });
+      _scrollToBottom();
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      _textController.text = text;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   void _showPlusActionsSheet() {
@@ -185,14 +201,20 @@ class _ChatPageState extends State<ChatPage> {
                     color: Color(0xFFEFF1FE),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.location_on, color: Color(0xFF6C3EE8)),
+                  child: const Icon(
+                    Icons.location_on,
+                    color: Color(0xFF6C3EE8),
+                  ),
                 ),
-                title: const Text('Share Live Location 📍',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text(
+                  'Share Live Location 📍',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: const Text('Let others know where you are standing'),
                 onTap: () {
                   Navigator.pop(context);
-                  _textController.text = "📍 Sharing my live location: Outside main lobby";
+                  _textController.text =
+                      "📍 Sharing my live location: Outside main lobby";
                   _sendMessage();
                 },
               ),
@@ -206,8 +228,10 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   child: const Icon(Icons.camera_alt, color: Color(0xFF6C3EE8)),
                 ),
-                title: const Text('Send Photo 📸',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text(
+                  'Send Photo 📸',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 subtitle: const Text('Snap a picture of the meeting spot'),
                 onTap: () {
                   Navigator.pop(context);
@@ -240,10 +264,7 @@ class _ChatPageState extends State<ChatPage> {
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Color(0xFFF2EDFC),
-                    Color(0xFFFAF8F5),
-                  ],
+                  colors: [Color(0xFFF2EDFC), Color(0xFFFAF8F5)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -255,17 +276,26 @@ class _ChatPageState extends State<ChatPage> {
           Positioned(
             top: topPadding + 42,
             right: 135,
-            child: const Text('✦', style: TextStyle(color: Color(0xFFBCA7FB), fontSize: 13)),
+            child: const Text(
+              '✦',
+              style: TextStyle(color: Color(0xFFBCA7FB), fontSize: 13),
+            ),
           ),
           Positioned(
             top: topPadding + 58,
             left: 145,
-            child: const Text('✦', style: TextStyle(color: Color(0xFFBCA7FB), fontSize: 11)),
+            child: const Text(
+              '✦',
+              style: TextStyle(color: Color(0xFFBCA7FB), fontSize: 11),
+            ),
           ),
           Positioned(
             top: topPadding + 140,
             right: 32,
-            child: const Text('✦', style: TextStyle(color: Color(0xFFC9B6FD), fontSize: 14)),
+            child: const Text(
+              '✦',
+              style: TextStyle(color: Color(0xFFC9B6FD), fontSize: 14),
+            ),
           ),
 
           // Main Column: Top Bar + Messages + Input
@@ -276,7 +306,12 @@ class _ChatPageState extends State<ChatPage> {
                 // TOP BAR: Arrow Back, "Matched!" checkmark badge, Group Info Pill
                 // -------------------------------------------------------------
                 Padding(
-                  padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 6),
+                  padding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 8,
+                    bottom: 6,
+                  ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -317,9 +352,11 @@ class _ChatPageState extends State<ChatPage> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            const Text(
-                              'Matched!',
-                              style: TextStyle(
+                            Text(
+                              widget.activity,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
                                 fontSize: 19,
                                 fontWeight: FontWeight.w800,
                                 color: Color(0xFF1E1B2E),
@@ -328,7 +365,7 @@ class _ChatPageState extends State<ChatPage> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '🔒 Anonymous Meetup • Today 3:30 PM',
+                              '🔒 Anonymous meetup • ${widget.place}',
                               style: const TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w500,
@@ -345,7 +382,8 @@ class _ChatPageState extends State<ChatPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const GpInfoPage(),
+                              builder: (context) =>
+                                  GpInfoPage(meetupId: widget.meetupId),
                             ),
                           );
                         },
@@ -357,7 +395,9 @@ class _ChatPageState extends State<ChatPage> {
                             borderRadius: BorderRadius.circular(20),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF6C3EE8).withOpacity(0.35),
+                                color: const Color(
+                                  0xFF6C3EE8,
+                                ).withOpacity(0.35),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -390,8 +430,14 @@ class _ChatPageState extends State<ChatPage> {
 
                 // Anonymous Safety Banner
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFEDE7FA),
                     borderRadius: BorderRadius.circular(16),
@@ -399,7 +445,11 @@ class _ChatPageState extends State<ChatPage> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.shield_outlined, color: Color(0xFF6C3EE8), size: 14),
+                      Icon(
+                        Icons.shield_outlined,
+                        color: Color(0xFF6C3EE8),
+                        size: 14,
+                      ),
                       SizedBox(width: 6),
                       Text(
                         'Anonymous Chat • Real identities hidden until you meet',
@@ -419,15 +469,38 @@ class _ChatPageState extends State<ChatPage> {
                 // CHAT MESSAGES LIST
                 // -------------------------------------------------------------
                 Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = _messages[index];
-                      return _buildMessageItem(msg);
-                    },
-                  ),
+                  child: _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _error != null && _messages.isEmpty
+                      ? _buildChatError()
+                      : RefreshIndicator(
+                          onRefresh: _loadMessages,
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            itemCount: _messages.isEmpty ? 1 : _messages.length,
+                            itemBuilder: (context, index) {
+                              if (_messages.isEmpty) {
+                                return const Padding(
+                                  padding: EdgeInsets.only(top: 80),
+                                  child: Center(
+                                    child: Text(
+                                      'No messages yet. Say hello!',
+                                      style: TextStyle(
+                                        color: Color(0xFF7E7993),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return _buildMessageItem(_messages[index]);
+                            },
+                          ),
+                        ),
                 ),
 
                 // -------------------------------------------------------------
@@ -481,6 +554,7 @@ class _ChatPageState extends State<ChatPage> {
                         Expanded(
                           child: TextField(
                             controller: _textController,
+                            enabled: widget.meetupId.trim().isNotEmpty,
                             onSubmitted: (_) => _sendMessage(),
                             style: const TextStyle(
                               fontSize: 14.5,
@@ -496,14 +570,16 @@ class _ChatPageState extends State<ChatPage> {
                               ),
                               border: InputBorder.none,
                               isDense: true,
-                              contentPadding: EdgeInsets.symmetric(vertical: 10),
+                              contentPadding: EdgeInsets.symmetric(
+                                vertical: 10,
+                              ),
                             ),
                           ),
                         ),
 
                         // Send (↑) Circular Purple Button
                         GestureDetector(
-                          onTap: _sendMessage,
+                          onTap: _sending ? null : _sendMessage,
                           child: Container(
                             width: 38,
                             height: 38,
@@ -511,11 +587,19 @@ class _ChatPageState extends State<ChatPage> {
                               color: Color(0xFF6C3EE8),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.arrow_upward_rounded,
-                              color: Colors.white,
-                              size: 21,
-                            ),
+                            child: _sending
+                                ? const Padding(
+                                    padding: EdgeInsets.all(10),
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.arrow_upward_rounded,
+                                    color: Colors.white,
+                                    size: 21,
+                                  ),
                           ),
                         ),
                       ],
@@ -526,6 +610,33 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChatError() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.chat_bubble_outline, color: Color(0xFF7E7993)),
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF7E7993)),
+            ),
+            if (widget.meetupId.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: _loadMessages,
+                child: const Text('Try again'),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -548,7 +659,10 @@ class _ChatPageState extends State<ChatPage> {
                 // Purple Message Bubble
                 Container(
                   constraints: const BoxConstraints(maxWidth: 240),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 13,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF6236E7),
                     borderRadius: const BorderRadius.only(
@@ -602,7 +716,7 @@ class _ChatPageState extends State<ChatPage> {
             const SizedBox(width: 10),
 
             // User Avatar
-            _buildAvatar(msg.avatarColor, msg.avatarEmoji),
+            _buildAvatar(msg.avatarColor, msg.avatarEmoji, msg.avatarUrl),
           ],
         ),
       );
@@ -614,7 +728,7 @@ class _ChatPageState extends State<ChatPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Member Avatar
-            _buildAvatar(msg.avatarColor, msg.avatarEmoji),
+            _buildAvatar(msg.avatarColor, msg.avatarEmoji, msg.avatarUrl),
             const SizedBox(width: 10),
 
             Column(
@@ -647,7 +761,10 @@ class _ChatPageState extends State<ChatPage> {
                 // Light Off-White Speech Bubble
                 Container(
                   constraints: const BoxConstraints(maxWidth: 240),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 13,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF3F1F8),
                     borderRadius: const BorderRadius.only(
@@ -693,7 +810,7 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
-  Widget _buildAvatar(Color color, String emoji) {
+  Widget _buildAvatar(Color color, String emoji, String? imageUrl) {
     return Container(
       width: 46,
       height: 46,
@@ -709,31 +826,38 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ],
       ),
-      child: Center(
-        child: Text(
-          emoji,
-          style: const TextStyle(fontSize: 22),
-        ),
-      ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl == null
+          ? Center(child: Text(emoji, style: const TextStyle(fontSize: 22)))
+          : Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Center(
+                child: Text(emoji, style: const TextStyle(fontSize: 22)),
+              ),
+            ),
     );
   }
 }
 
 class ChatMessage {
+  final String id;
   final String sender;
   final String text;
   final String time;
   final bool isMe;
   final Color avatarColor;
   final String avatarEmoji;
+  final String? avatarUrl;
 
   const ChatMessage({
+    required this.id,
     required this.sender,
     required this.text,
     required this.time,
     required this.isMe,
     required this.avatarColor,
     required this.avatarEmoji,
+    this.avatarUrl,
   });
 }
-

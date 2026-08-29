@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' hide Path;
+import 'auth/auth_api.dart';
 import 'chat.dart';
+import 'main.dart' show HomePage;
+import 'map_style.dart';
+import 'requests/active_request_store.dart';
+import 'requests/meetup_requests_api.dart';
 
 class SearchingPage extends StatefulWidget {
   final String activity;
   final String people;
   final String place;
   final String time;
+  final double latitude;
+  final double longitude;
+  final int acceptedCount;
+  final String meetupId;
+  final String requestId;
 
   const SearchingPage({
     super.key,
@@ -15,72 +25,37 @@ class SearchingPage extends StatefulWidget {
     this.people = '2',
     this.place = 'Sydney CBD',
     this.time = '8:30 AM',
+    this.latitude = -33.8688,
+    this.longitude = 151.2093,
+    this.acceptedCount = 0,
+    this.meetupId = '',
+    this.requestId = '',
   });
+
+  SearchingPage.fromRequest(ActiveMeetupRequest request, {super.key})
+    : activity = request.activity,
+      people = request.people,
+      place = request.place,
+      time = request.time,
+      latitude = request.latitude,
+      longitude = request.longitude,
+      acceptedCount = request.acceptedCount,
+      meetupId = request.meetupId,
+      requestId = request.id;
 
   @override
   State<SearchingPage> createState() => _SearchingPageState();
 }
 
-class _SearchingPageState extends State<SearchingPage> with SingleTickerProviderStateMixin {
+class _SearchingPageState extends State<SearchingPage>
+    with SingleTickerProviderStateMixin {
   final MapController _mapController = MapController();
-  final LatLng _initialCenter = const LatLng(-33.8688, 151.2093); // Sydney CBD & Harbor
+  final MeetupRequestsApi _requestsApi = MeetupRequestsApi();
+  late final LatLng _initialCenter = LatLng(widget.latitude, widget.longitude);
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-
-  // Real GPS Map Pins in Sydney
-  final List<MapPinData> _pins = const [
-    MapPinData(
-      id: 'pin_1',
-      title: 'Wants to grab\ncoffee! ☕',
-      time: '15 mins ago',
-      location: LatLng(-33.8610, 151.2105),
-      category: 'Coffee',
-      author: 'Elena R.',
-      distance: '0.4 km away',
-      description: 'Working at a cafe near Circular Quay, free for the next hour to grab a flat white!',
-    ),
-    MapPinData(
-      id: 'pin_2',
-      title: 'Down for\na walk 🚶',
-      time: '8 mins ago',
-      location: LatLng(-33.8645, 151.2175),
-      category: 'Walk',
-      author: 'Marcus K.',
-      distance: '0.3 km away',
-      description: 'Walking along the Botanic Garden harbor path towards Mrs Macquarie Chair. Join in!',
-    ),
-    MapPinData(
-      id: 'pin_3',
-      title: 'Brunch\nanyone? 🥐',
-      time: '22 mins ago',
-      location: LatLng(-33.8825, 151.2135),
-      category: 'Food',
-      author: 'Sophie T.',
-      distance: '0.8 km away',
-      description: 'Heading to a bakery in Surry Hills on Crown St. Craving croissants & iced matcha!',
-    ),
-    MapPinData(
-      id: 'pin_4',
-      title: 'Open to\nany plans! 🎉',
-      time: '12 mins ago',
-      location: LatLng(-33.8745, 151.2005),
-      category: 'Social',
-      author: 'David L.',
-      distance: '0.5 km away',
-      description: 'Chilling at Darling Quarter! Up for bowling, bubble tea, or gaming.',
-    ),
-    MapPinData(
-      id: 'pin_5',
-      title: "Let's explore\nthe city! 🌉",
-      time: '5 mins ago',
-      location: LatLng(-33.8550, 151.2100),
-      category: 'Explore',
-      author: 'Chloe M.',
-      distance: '0.9 km away',
-      description: 'Walking across the Sydney Harbour Bridge! Looking for company to enjoy the views.',
-    ),
-  ];
+  bool _cancelling = false;
 
   @override
   void initState() {
@@ -90,9 +65,27 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
       duration: const Duration(milliseconds: 1800),
     )..repeat();
 
-    _pulseAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
-    );
+    _pulseAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeOut));
+
+    final maximumPeople = int.tryParse(widget.people.split('-').last) ?? 1;
+    if (widget.acceptedCount >= maximumPeople && widget.meetupId.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => ChatPage(
+              activity: widget.activity,
+              place: widget.place,
+              meetupId: widget.meetupId,
+            ),
+          ),
+        );
+      });
+    }
   }
 
   @override
@@ -106,172 +99,164 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
     final mediaQuery = MediaQuery.of(context);
     final topPadding = mediaQuery.padding.top;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4FD),
-      body: Column(
-        children: [
-          // -------------------------------------------------------------
-          // TOP SECTION (Searching Status Card + Sydney Match Status)
-          // -------------------------------------------------------------
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF1FE),
-              borderRadius: const BorderRadius.vertical(
-                bottom: Radius.circular(32),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF6C3EE8).withOpacity(0.08),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF3F4FD),
+        body: Column(
+          children: [
+            // -------------------------------------------------------------
+            // TOP SECTION (Searching Status Card + Sydney Match Status)
+            // -------------------------------------------------------------
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF1FE),
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(32),
                 ),
-              ],
-            ),
-            child: Padding(
-              padding: EdgeInsets.only(
-                top: topPadding > 0 ? topPadding + 6 : 24,
-                left: 20,
-                right: 20,
-                bottom: 18,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF6C3EE8).withOpacity(0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  top: topPadding > 0 ? topPadding + 6 : 24,
+                  left: 20,
+                  right: 20,
+                  bottom: 18,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top Row: Avatar & Notifications
+                    _buildTopBar(),
+                    const SizedBox(height: 18),
+
+                    // Section Title: "Searching for matches..."
+                    _buildSectionHeader(),
+                    const SizedBox(height: 14),
+
+                    // Searching Status Card
+                    _buildSearchingStatusCard(),
+                  ],
+                ),
+              ),
+            ),
+
+            // -------------------------------------------------------------
+            // BOTTOM SECTION: Live Moving Map with Red Cancel Button
+            // -------------------------------------------------------------
+            Expanded(
+              child: Stack(
                 children: [
-                  // Top Row: Avatar & Notifications
-                  _buildTopBar(),
-                  const SizedBox(height: 18),
+                  // Real Live Moving Map Layer
+                  Positioned.fill(
+                    child: FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: _initialCenter,
+                        initialZoom: 14.3,
+                        minZoom: 3.0,
+                        maxZoom: 18.5,
+                        interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.all,
+                        ),
+                      ),
+                      children: [
+                        // OpenStreetMap standard tiles require no API key.
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.syncshack.meetupapp',
+                          tileBuilder: heyPastelTileBuilder,
+                        ),
+                        const RichAttributionWidget(
+                          attributions: [
+                            TextSourceAttribution('OpenStreetMap contributors'),
+                          ],
+                        ),
 
-                  // Section Title: "Searching for matches..."
-                  _buildSectionHeader(),
-                  const SizedBox(height: 14),
+                        // User Radar Pulsing Marker
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: _initialCenter,
+                              width: 90,
+                              height: 90,
+                              alignment: Alignment.center,
+                              child: AnimatedBuilder(
+                                animation: _pulseAnimation,
+                                builder: (context, child) {
+                                  return Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Container(
+                                        width: 80 * _pulseAnimation.value,
+                                        height: 80 * _pulseAnimation.value,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: const Color(0xFF6C3EE8)
+                                              .withOpacity(
+                                                1.0 - _pulseAnimation.value,
+                                              ),
+                                        ),
+                                      ),
+                                      Container(
+                                        width: 20,
+                                        height: 20,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF6C3EE8),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 3,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(
+                                                0xFF6C3EE8,
+                                              ).withOpacity(0.5),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
 
-                  // Searching Status Card
-                  _buildSearchingStatusCard(),
+                  // Top-Left: "Searching in Sydney" Pill
+                  Positioned(top: 14, left: 16, child: _buildSearchingPill()),
+
+                  // Top-Right: GPS Location Target Button
+                  Positioned(top: 14, right: 16, child: _buildGpsButton()),
+
+                  // Bottom Action Buttons: Red "Cancel" + Purple "Search & Chat"
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: mediaQuery.padding.bottom > 0
+                        ? mediaQuery.padding.bottom + 12
+                        : 28,
+                    child: _buildBottomActionButtons(),
+                  ),
                 ],
               ),
             ),
-          ),
-
-          // -------------------------------------------------------------
-          // BOTTOM SECTION: Live Moving Map with Red Cancel Button
-          // -------------------------------------------------------------
-          Expanded(
-            child: Stack(
-              children: [
-                // Real Live Moving Map Layer
-                Positioned.fill(
-                  child: FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: _initialCenter,
-                      initialZoom: 14.3,
-                      minZoom: 3.0,
-                      maxZoom: 18.5,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.all,
-                      ),
-                    ),
-                    children: [
-                      // CartoDB Voyager Map Tiles (Pastel clean light theme)
-                      TileLayer(
-                        urlTemplate:
-                            'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-                        fallbackUrl:
-                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        userAgentPackageName: 'com.syncshack.meetupapp',
-                      ),
-
-                      // User Radar Pulsing Marker
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            point: _initialCenter,
-                            width: 90,
-                            height: 90,
-                            alignment: Alignment.center,
-                            child: AnimatedBuilder(
-                              animation: _pulseAnimation,
-                              builder: (context, child) {
-                                return Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    Container(
-                                      width: 80 * _pulseAnimation.value,
-                                      height: 80 * _pulseAnimation.value,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: const Color(0xFF6C3EE8)
-                                            .withOpacity(1.0 - _pulseAnimation.value),
-                                      ),
-                                    ),
-                                    Container(
-                                      width: 20,
-                                      height: 20,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF6C3EE8),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: Colors.white, width: 3),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(0xFF6C3EE8).withOpacity(0.5),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          )
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ),
-
-                          // Active Sydney Pins
-                          ..._pins.map((pin) {
-                            return Marker(
-                              point: pin.location,
-                              width: 140,
-                              height: 100,
-                              alignment: Alignment.topCenter,
-                              child: _MapPinWidget(
-                                pinData: pin,
-                                onTap: () => _showPinDetailSheet(pin),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Top-Left: "Searching in Sydney" Pill
-                Positioned(
-                  top: 14,
-                  left: 16,
-                  child: _buildSearchingPill(),
-                ),
-
-                // Top-Right: GPS Location Target Button
-                Positioned(
-                  top: 14,
-                  right: 16,
-                  child: _buildGpsButton(),
-                ),
-
-                // Bottom Action Buttons: Red "Cancel" + Purple "Search & Chat"
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: mediaQuery.padding.bottom > 0
-                      ? mediaQuery.padding.bottom + 12
-                      : 28,
-                  child: _buildBottomActionButtons(),
-                ),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -283,27 +268,24 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        GestureDetector(
-          onTap: () => Navigator.of(context).popUntil((route) => route.isFirst),
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: Color(0xFF1E1B2E),
-              size: 18,
-            ),
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: const Icon(
+            Icons.hourglass_top_rounded,
+            color: Color(0xFF1E1B2E),
+            size: 18,
           ),
         ),
 
@@ -350,11 +332,7 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
       children: const [
         Row(
           children: [
-            Icon(
-              Icons.radar_rounded,
-              color: Color(0xFF6C3EE8),
-              size: 22,
-            ),
+            Icon(Icons.radar_rounded, color: Color(0xFF6C3EE8), size: 22),
             SizedBox(width: 8),
             Text(
               'Finding your match...',
@@ -408,10 +386,7 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
               shape: BoxShape.circle,
             ),
             child: const Center(
-              child: Text(
-                '☕',
-                style: TextStyle(fontSize: 26),
-              ),
+              child: Text('☕', style: TextStyle(fontSize: 26)),
             ),
           ),
           const SizedBox(width: 14),
@@ -422,7 +397,9 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  widget.activity.isNotEmpty ? widget.activity : 'Grab Coffee ☕',
+                  widget.activity.isNotEmpty
+                      ? widget.activity
+                      : 'Grab Coffee ☕',
                   style: const TextStyle(
                     fontSize: 16.5,
                     fontWeight: FontWeight.w800,
@@ -439,6 +416,16 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+
+                Text(
+                  '${widget.acceptedCount} accepted',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF6C3EE8),
+                  ),
                 ),
                 const SizedBox(height: 8),
 
@@ -503,11 +490,7 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.explore_rounded,
-            color: Color(0xFF6C3EE8),
-            size: 17,
-          ),
+          Icon(Icons.explore_rounded, color: Color(0xFF6C3EE8), size: 17),
           SizedBox(width: 6),
           Text(
             'Searching nearby in Sydney...',
@@ -554,39 +537,91 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
   }
 
   // -------------------------------------------------------------
-  // BOTTOM ACTION BUTTONS: Red "Cancel" + Purple "Search & Chat"
+  void _openChat() {
+    if (widget.acceptedCount == 0 || widget.meetupId.isEmpty) {
+      showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Still waiting'),
+          content: const Text(
+            'You must wait for someone to accept your request before chatting.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ChatPage(
+          activity: widget.activity,
+          place: widget.place,
+          meetupId: widget.meetupId,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cancelRequest() async {
+    if (_cancelling) return;
+    if (widget.requestId.trim().isEmpty) {
+      _showCancellationError('This request is missing its request ID.');
+      return;
+    }
+    setState(() => _cancelling = true);
+    try {
+      await _requestsApi.cancel(widget.requestId);
+      await ActiveRequestStore.clear();
+      if (!mounted) return;
+
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute<void>(builder: (_) => const HomePage()),
+        );
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Meetup request cancelled.'),
+          backgroundColor: Color(0xFFE53935),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on AuthException catch (error) {
+      if (mounted) _showCancellationError(error.message);
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
+  void _showCancellationError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: const Color(0xFFE53935),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // Cancel the active request before allowing another one.
   // -------------------------------------------------------------
   Widget _buildBottomActionButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Row(
         children: [
-          // 🔴 Red Cancel Button
           Expanded(
             flex: 2,
             child: GestureDetector(
-              onTap: () {
-                // Pop back to the HomePage
-                Navigator.of(context).popUntil((route) => route.isFirst);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Row(
-                      children: [
-                        Icon(Icons.cancel_outlined,
-                            color: Colors.white, size: 19),
-                        SizedBox(width: 8),
-                        Text('Meetup request cancelled.'),
-                      ],
-                    ),
-                    backgroundColor: const Color(0xFFE53935),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                );
-              },
+              onTap: _cancelling ? null : _cancelRequest,
               child: Container(
                 height: 52,
                 decoration: BoxDecoration(
@@ -603,18 +638,28 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
                     ),
                   ],
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.close_rounded,
-                      color: Color(0xFFE53935),
-                      size: 20,
-                    ),
-                    SizedBox(width: 6),
+                    if (_cancelling)
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFFE53935),
+                        ),
+                      )
+                    else
+                      const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFFE53935),
+                        size: 20,
+                      ),
+                    const SizedBox(width: 6),
                     Text(
-                      'Cancel',
-                      style: TextStyle(
+                      _cancelling ? 'Cancelling' : 'Cancel',
+                      style: const TextStyle(
                         color: Color(0xFFE53935),
                         fontSize: 14.5,
                         fontWeight: FontWeight.w700,
@@ -626,60 +671,33 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
             ),
           ),
           const SizedBox(width: 12),
-
-          // 💜 Purple Search / Chat Button -> Goes to chat.dart
           Expanded(
             flex: 3,
             child: GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ChatPage(
-                      matchName: 'Elena Rivera',
-                      activity: widget.activity,
-                      place: widget.place,
-                    ),
-                  ),
-                );
-              },
+              onTap: _openChat,
               child: Container(
                 height: 52,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF5A25E6),
-                      Color(0xFF8E45FF),
-                    ],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
+                  color: widget.acceptedCount > 0 && widget.meetupId.isNotEmpty
+                      ? const Color(0xFF6C3EE8)
+                      : const Color(0xFFD5D3DB),
                   borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF6C3EE8).withOpacity(0.45),
-                      blurRadius: 16,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.chat_bubble_outline_rounded,
                       color: Colors.white,
                       size: 19,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
-                      'Search & Chat 💬',
-                      style: TextStyle(
+                      widget.acceptedCount == 0 ? 'Chat (waiting)' : 'Chat',
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.1,
                       ),
                     ),
                   ],
@@ -723,17 +741,28 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
                 children: [
                   Text(
                     pin.title.replaceAll('\n', ' '),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF1E1B2E)),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E1B2E),
+                    ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFEFF1FE),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       pin.time,
-                      style: const TextStyle(color: Color(0xFF6C3EE8), fontSize: 11, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Color(0xFF6C3EE8),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -746,7 +775,11 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
               const SizedBox(height: 14),
               Text(
                 pin.description,
-                style: const TextStyle(color: Color(0xFF333344), fontSize: 14, height: 1.4),
+                style: const TextStyle(
+                  color: Color(0xFF333344),
+                  fontSize: 14,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 20),
               SizedBox(
@@ -776,9 +809,17 @@ class _SearchingPageState extends State<SearchingPage> with SingleTickerProvider
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF6C3EE8),
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
                   ),
-                  child: const Text('Connect & Open Chat 💬', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
+                  child: const Text(
+                    'Connect & Open Chat 💬',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.5,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -821,10 +862,7 @@ class _MapPinWidget extends StatelessWidget {
   final MapPinData pinData;
   final VoidCallback onTap;
 
-  const _MapPinWidget({
-    required this.pinData,
-    required this.onTap,
-  });
+  const _MapPinWidget({required this.pinData, required this.onTap});
 
   @override
   Widget build(BuildContext context) {

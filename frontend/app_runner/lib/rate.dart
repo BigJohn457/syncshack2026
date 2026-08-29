@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'auth/auth_api.dart';
+import 'ratings/ratings_api.dart';
 
 // "hey!" brand palette
 const _kPurple = Color(0xFF6C3EE8);
@@ -7,11 +9,13 @@ const _kCream = Color(0xFFFAF8F5);
 const _kCardBg = Colors.white;
 
 class MemberRating {
+  final String userId;
   final String name;
   bool isChecked;
   int rating; // 0 to 3
 
   MemberRating({
+    required this.userId,
     required this.name,
     this.isChecked = true,
     this.rating = 0,
@@ -20,35 +24,54 @@ class MemberRating {
 
 class RatePage extends StatefulWidget {
   final String meetupType;
+  final String meetupId;
+  final List<RateableMember> members;
 
   const RatePage({
     super.key,
     this.meetupType = 'coffee meetup',
+    this.meetupId = '',
+    this.members = const [],
   });
 
   @override
   State<RatePage> createState() => _RatePageState();
 }
 
+class RateableMember {
+  const RateableMember({required this.userId, required this.name});
+
+  final String userId;
+  final String name;
+}
+
 class _RatePageState extends State<RatePage> {
   late List<MemberRating> _members;
+  final RatingsApi _ratingsApi = RatingsApi();
+  bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
-    _members = [
-      MemberRating(name: 'John', isChecked: false, rating: 1),
-      MemberRating(name: 'Maya', isChecked: false, rating: 2),
-      MemberRating(name: 'Ethan', isChecked: false, rating: 0),
-    ];
+    _members = widget.members
+        .map(
+          (member) => MemberRating(
+            userId: member.userId,
+            name: member.name,
+            isChecked: false,
+          ),
+        )
+        .toList();
   }
 
   void _setRating(int memberIndex, int starIndex) {
     setState(() {
       if (_members[memberIndex].rating == starIndex) {
         _members[memberIndex].rating = 0; // Deselect if tapped again
+        _members[memberIndex].isChecked = false;
       } else {
         _members[memberIndex].rating = starIndex;
+        _members[memberIndex].isChecked = true;
       }
     });
   }
@@ -59,7 +82,46 @@ class _RatePageState extends State<RatePage> {
     });
   }
 
-  void _submitRatings() {
+  Future<void> _submitRatings() async {
+    if (_submitting) return;
+    if (widget.meetupId.trim().isEmpty) {
+      _showError('This rating screen is missing its meetup ID.');
+      return;
+    }
+    final selected = _members
+        .where((member) => member.isChecked && member.rating > 0)
+        .toList();
+    if (selected.isEmpty) {
+      _showError('Select at least one person and choose a rating.');
+      return;
+    }
+    if (selected.any((member) => member.userId.trim().isEmpty)) {
+      _showError('A selected participant is missing their user ID.');
+      return;
+    }
+
+    setState(() => _submitting = true);
+    final failures = <String>[];
+    for (final member in selected) {
+      try {
+        await _ratingsApi.submit(
+          meetupId: widget.meetupId.trim(),
+          toUserId: member.userId.trim(),
+          rating: member.rating,
+        );
+        member.isChecked = false;
+        member.rating = 0;
+      } on AuthException catch (error) {
+        failures.add('${member.name}: ${error.message}');
+      }
+    }
+    if (!mounted) return;
+    setState(() => _submitting = false);
+    if (failures.isNotEmpty) {
+      _showError(failures.join('\n'));
+      return;
+    }
+
     Navigator.of(context).popUntil((route) => route.isFirst);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -75,10 +137,14 @@ class _RatePageState extends State<RatePage> {
         ),
         backgroundColor: const Color(0xFF6C3EE8),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -100,10 +166,7 @@ class _RatePageState extends State<RatePage> {
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    _kCream,
-                    Color(0xFFEDE7FA),
-                  ],
+                  colors: [_kCream, Color(0xFFEDE7FA)],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -115,26 +178,34 @@ class _RatePageState extends State<RatePage> {
           Positioned(
             top: topPadding + 65,
             left: 20,
-            child: const Text('✦',
-                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14)),
+            child: const Text(
+              '✦',
+              style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14),
+            ),
           ),
           Positioned(
             top: topPadding + 130,
             right: 30,
-            child: const Text('✦',
-                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16)),
+            child: const Text(
+              '✦',
+              style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16),
+            ),
           ),
           Positioned(
             bottom: 60,
             left: 32,
-            child: const Text('✦',
-                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14)),
+            child: const Text(
+              '✦',
+              style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 14),
+            ),
           ),
           Positioned(
             bottom: 80,
             right: 40,
-            child: const Text('✦',
-                style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16)),
+            child: const Text(
+              '✦',
+              style: TextStyle(color: Color(0xFFC7B3FD), fontSize: 16),
+            ),
           ),
 
           SafeArea(
@@ -144,8 +215,10 @@ class _RatePageState extends State<RatePage> {
                 // TOP BAR: Round Back Button (Left), User Avatar (Right)
                 // -------------------------------------------------------------
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -191,10 +264,7 @@ class _RatePageState extends State<RatePage> {
                           ],
                         ),
                         child: const Center(
-                          child: Text(
-                            '👩🏽',
-                            style: TextStyle(fontSize: 26),
-                          ),
+                          child: Text('👩🏽', style: TextStyle(fontSize: 26)),
                         ),
                       ),
                     ],
@@ -231,15 +301,27 @@ class _RatePageState extends State<RatePage> {
                 // RATING CARDS LIST
                 // -------------------------------------------------------------
                 Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _members.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 16),
-                    itemBuilder: (context, index) {
-                      final member = _members[index];
-                      return _buildRatingCard(index, member);
-                    },
-                  ),
+                  child: _members.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Text(
+                              'No participants are available to rate.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Color(0xFF7E7993)),
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: _members.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 16),
+                          itemBuilder: (context, index) {
+                            final member = _members[index];
+                            return _buildRatingCard(index, member);
+                          },
+                        ),
                 ),
 
                 // -------------------------------------------------------------
@@ -255,15 +337,12 @@ class _RatePageState extends State<RatePage> {
                         : 20,
                   ),
                   child: GestureDetector(
-                    onTap: _submitRatings,
+                    onTap: _submitting ? null : _submitRatings,
                     child: Container(
                       height: 56,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF6C3EE8),
-                            Color(0xFF8E45FF),
-                          ],
+                          colors: [Color(0xFF6C3EE8), Color(0xFF8E45FF)],
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
                         ),
@@ -277,18 +356,28 @@ class _RatePageState extends State<RatePage> {
                           ),
                         ],
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.check_circle_outline_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                          SizedBox(width: 8),
+                          if (_submitting)
+                            const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          else
+                            const Icon(
+                              Icons.check_circle_outline_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          const SizedBox(width: 8),
                           Text(
-                            'Submit Ratings ✨',
-                            style: TextStyle(
+                            _submitting ? 'Submitting...' : 'Submit Ratings ✨',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
@@ -345,11 +434,7 @@ class _RatePageState extends State<RatePage> {
                 ),
               ),
               child: member.isChecked
-                  ? const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                      size: 16,
-                    )
+                  ? const Icon(Icons.check, color: Colors.white, size: 16)
                   : null,
             ),
           ),
@@ -368,27 +453,25 @@ class _RatePageState extends State<RatePage> {
             ),
           ),
 
-          // 3 Interactive Star Rating Buttons
+          // 5-star rating required by the API.
           Row(
             mainAxisSize: MainAxisSize.min,
-            children: List.generate(3, (starIdx) {
+            children: List.generate(5, (starIdx) {
               final starNumber = starIdx + 1;
               final isFilled = member.rating >= starNumber;
 
               return Padding(
-                padding: const EdgeInsets.only(left: 10),
+                padding: const EdgeInsets.only(left: 4),
                 child: GestureDetector(
                   onTap: () => _setRating(memberIndex, starNumber),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOut,
-                    width: 38,
-                    height: 38,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isFilled
-                          ? _kPurple
-                          : const Color(0xFFF6F3FD),
+                      color: isFilled ? _kPurple : const Color(0xFFF6F3FD),
                       border: Border.all(
                         color: isFilled
                             ? _kPurple
@@ -413,7 +496,7 @@ class _RatePageState extends State<RatePage> {
                         color: isFilled
                             ? Colors.white
                             : const Color(0xFF241B3A),
-                        size: 21,
+                        size: 18,
                       ),
                     ),
                   ),

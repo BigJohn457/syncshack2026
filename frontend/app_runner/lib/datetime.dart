@@ -1,4 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
+
+import 'auth/auth_api.dart';
+import 'chat.dart';
+import 'requests/active_request_store.dart';
+import 'requests/meetup_requests_api.dart';
+import 'requests/place_search_api.dart';
 import 'searching.dart';
 
 // "hey!" brand palette
@@ -12,13 +21,22 @@ const _kHeading = Color(0xFF241B3A);
 
 class DateTimeSetupPage extends StatefulWidget {
   final String currentUserAvatarUrl;
+  final LatLng? initialLocation;
   final VoidCallback? onBack;
-  final void Function(String activity, String people, String place, int hour,
-      int minute, bool isAm)? onRequestMeetup;
+  final void Function(
+    String activity,
+    String people,
+    String place,
+    int hour,
+    int minute,
+    bool isAm,
+  )?
+  onRequestMeetup;
 
   const DateTimeSetupPage({
     super.key,
     this.currentUserAvatarUrl = '',
+    this.initialLocation,
     this.onBack,
     this.onRequestMeetup,
   });
@@ -29,19 +47,31 @@ class DateTimeSetupPage extends StatefulWidget {
 
 class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
   final _formKey = GlobalKey<FormState>();
+  final _api = MeetupRequestsApi();
+  final _placeSearchApi = PlaceSearchApi();
   final _activityController = TextEditingController();
-  final _peopleController = TextEditingController();
   final _placeController = TextEditingController();
 
+  int _minPeople = 1;
+  int _maxPeople = 2;
   int _hour = 8;
   int _minute = 30;
   bool _isAm = true;
+  bool _isSubmitting = false;
+  bool _isSearchingPlaces = false;
+  String? _submitError;
+  String? _placeError;
+  PlaceSearchResult? _selectedPlace;
+  List<PlaceSearchResult> _placeSuggestions = const [];
+  Timer? _placeSearchDebounce;
+  int _placeSearchGeneration = 0;
 
   @override
   void dispose() {
     _activityController.dispose();
-    _peopleController.dispose();
     _placeController.dispose();
+    _placeSearchDebounce?.cancel();
+    _placeSearchApi.close();
     super.dispose();
   }
 
@@ -51,6 +81,155 @@ class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
 
   void _cycleMinute() {
     setState(() => _minute = (_minute + 5) % 60);
+  }
+
+  void _onPlaceQueryChanged(String query) {
+    _placeSearchDebounce?.cancel();
+    final generation = ++_placeSearchGeneration;
+    setState(() {
+      _selectedPlace = null;
+      _placeError = null;
+      if (query.trim().length < 3) _placeSuggestions = const [];
+    });
+    if (query.trim().length < 3) return;
+    if (!_placeSearchApi.isConfigured) {
+      setState(() {
+        _placeError = 'Geoapify API key is not configured.';
+        _placeSuggestions = const [];
+      });
+      return;
+    }
+
+    _placeSearchDebounce = Timer(const Duration(milliseconds: 450), () async {
+      setState(() => _isSearchingPlaces = true);
+      try {
+        final results = await _placeSearchApi.search(
+          query,
+          near: widget.initialLocation,
+        );
+        if (!mounted || generation != _placeSearchGeneration) return;
+        setState(() {
+          _placeSuggestions = results;
+          if (results.isEmpty) _placeError = 'No matching places found';
+        });
+      } on Exception {
+        if (mounted && generation == _placeSearchGeneration) {
+          setState(() => _placeError = 'Could not search places. Try again.');
+        }
+      } finally {
+        if (mounted && generation == _placeSearchGeneration) {
+          setState(() => _isSearchingPlaces = false);
+        }
+      }
+    });
+  }
+
+  void _selectPlace(PlaceSearchResult place) {
+    setState(() {
+      _selectedPlace = place;
+      _placeSuggestions = const [];
+      _placeError = null;
+      _placeController.value = TextEditingValue(
+        text: place.address,
+        selection: TextSelection.collapsed(offset: place.address.length),
+      );
+    });
+  }
+
+  DateTime _nextMeetTime() {
+    final now = DateTime.now();
+    var hour24 = _hour % 12;
+    if (!_isAm) hour24 += 12;
+    var result = DateTime(now.year, now.month, now.day, hour24, _minute);
+    if (!result.isAfter(now)) result = result.add(const Duration(days: 1));
+    return result;
+  }
+
+  Future<void> _submitMeetup() async {
+    FocusScope.of(context).unfocus();
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _isSubmitting = true;
+      _submitError = null;
+    });
+
+    try {
+      final activeRequest = await ActiveRequestStore.load();
+      if (activeRequest != null) {
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => activeRequest.isFull
+                ? ChatPage(
+                    activity: activeRequest.activity,
+                    place: activeRequest.place,
+                    meetupId: activeRequest.meetupId,
+                  )
+                : SearchingPage.fromRequest(activeRequest),
+          ),
+        );
+        return;
+      }
+      final selectedPlace = _selectedPlace;
+      if (selectedPlace == null) {
+        throw const AuthException('Search for and select a place first.');
+      }
+      final location = selectedPlace.location;
+      final placeName = selectedPlace.address;
+      final meetTime = _nextMeetTime();
+      final createdRequest = await _api.create(
+        title: _activityController.text,
+        minPeople: _minPeople,
+        maxPeople: _maxPeople,
+        meetTime: meetTime,
+        location: location,
+        placeName: placeName,
+        expiresAt: meetTime.add(const Duration(minutes: 30)),
+      );
+      if (!mounted) return;
+
+      final active = ActiveMeetupRequest(
+        id: createdRequest['request_id']?.toString() ?? '',
+        activity: _activityController.text.trim(),
+        people: '$_minPeople-$_maxPeople',
+        place: placeName,
+        time:
+            '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')} ${_isAm ? "AM" : "PM"}',
+        latitude: location.latitude,
+        longitude: location.longitude,
+        expiresAt: meetTime.add(const Duration(minutes: 30)),
+        acceptedCount: (createdRequest['accepted_count'] as num?)?.toInt() ?? 0,
+        meetupId: createdRequest['meetup_id']?.toString() ?? '',
+      );
+      await ActiveRequestStore.save(active);
+      if (!mounted) return;
+
+      widget.onRequestMeetup?.call(
+        _activityController.text,
+        _maxPeople.toString(),
+        placeName,
+        _hour,
+        _minute,
+        _isAm,
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SearchingPage.fromRequest(active),
+        ),
+      );
+    } on AuthException catch (error) {
+      if (mounted) setState(() => _submitError = error.message);
+    } on Exception {
+      if (mounted) {
+        setState(
+          () => _submitError = 'Could not create the meetup. Try again.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   @override
@@ -63,14 +242,20 @@ class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
             Positioned(
               top: 60,
               right: 120,
-              child: Icon(Icons.auto_awesome,
-                  color: _kPurple.withOpacity(0.5), size: 22),
+              child: Icon(
+                Icons.auto_awesome,
+                color: _kPurple.withValues(alpha: 0.5),
+                size: 22,
+              ),
             ),
             Positioned(
               top: 92,
               right: 96,
-              child: Icon(Icons.auto_awesome,
-                  color: _kPurple.withOpacity(0.35), size: 14),
+              child: Icon(
+                Icons.auto_awesome,
+                color: _kPurple.withValues(alpha: 0.35),
+                size: 14,
+              ),
             ),
             SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -110,35 +295,114 @@ class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: _FieldPill(
-                            icon: Icons.people_alt_rounded,
-                            hint: 'Number of people',
-                            controller: _peopleController,
-                            keyboardType: TextInputType.number,
-                            validator: (value) {
-                              final n = int.tryParse(value?.trim() ?? '');
-                              if (n == null || n <= 0) {
-                                return 'Enter a number';
-                              }
-                              return null;
+                          child: _NumberDropdownPill(
+                            icon: Icons.people_outline_rounded,
+                            label: 'Min people',
+                            value: _minPeople,
+                            values: List.generate(20, (index) => index + 1),
+                            onChanged: (value) {
+                              if (value == null) return;
+                              setState(() {
+                                _minPeople = value;
+                                if (_maxPeople < value) _maxPeople = value;
+                              });
                             },
                           ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
-                          child: _FieldPill(
-                            icon: Icons.location_on_rounded,
-                            hint: 'Place',
-                            controller: _placeController,
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Required';
+                          child: _NumberDropdownPill(
+                            icon: Icons.people_alt_rounded,
+                            label: 'Max people',
+                            value: _maxPeople,
+                            values: List.generate(
+                              21 - _minPeople,
+                              (index) => index + _minPeople,
+                            ),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _maxPeople = value);
                               }
-                              return null;
                             },
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 14),
+                    _FieldPill(
+                      icon: Icons.location_on_rounded,
+                      hint: 'Start typing a place or address',
+                      controller: _placeController,
+                      keyboardType: TextInputType.streetAddress,
+                      onChanged: _onPlaceQueryChanged,
+                      trailing: _isSearchingPlaces
+                          ? const Padding(
+                              padding: EdgeInsets.all(10),
+                              child: SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            )
+                          : const Icon(Icons.search_rounded, color: _kPurple),
+                      validator: (_) => _selectedPlace == null
+                          ? 'Choose a place from the suggestions'
+                          : null,
+                    ),
+                    if (_placeSuggestions.isNotEmpty)
+                      Container(
+                        margin: const EdgeInsets.only(top: 8),
+                        constraints: const BoxConstraints(maxHeight: 260),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _kPurpleDark.withValues(alpha: 0.10),
+                              blurRadius: 18,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          itemCount: _placeSuggestions.length,
+                          separatorBuilder: (_, _) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final place = _placeSuggestions[index];
+                            return ListTile(
+                              leading: const Icon(
+                                Icons.place_outlined,
+                                color: _kPurple,
+                              ),
+                              title: Text(
+                                place.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                place.address,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onTap: () => _selectPlace(place),
+                            );
+                          },
+                        ),
+                      ),
+                    if (_placeError != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _placeError!,
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Place search powered by Geoapify • © OpenStreetMap contributors',
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                     const SizedBox(height: 20),
                     _SelectTimeCard(
@@ -149,48 +413,21 @@ class _DateTimeSetupPageState extends State<DateTimeSetupPage> {
                       onMinuteTap: _cycleMinute,
                       onAmSelected: () => setState(() => _isAm = true),
                       onPmSelected: () => setState(() => _isAm = false),
-                      onCancel: () => setState(() {
-                        _hour = 8;
-                        _minute = 30;
-                        _isAm = true;
-                      }),
-                      onOk: () {
-                        FocusScope.of(context).unfocus();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Time set to ${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')} ${_isAm ? 'AM' : 'PM'}',
-                            ),
-                            duration: const Duration(seconds: 1),
-                          ),
-                        );
-                      },
                     ),
                     const SizedBox(height: 28),
+                    if (_submitError != null) ...[
+                      Text(
+                        _submitError!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     _RequestMeetupButton(
-                      onPressed: () {
-                        if (!_formKey.currentState!.validate()) return;
-                        widget.onRequestMeetup?.call(
-                          _activityController.text,
-                          _peopleController.text,
-                          _placeController.text,
-                          _hour,
-                          _minute,
-                          _isAm,
-                        );
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SearchingPage(
-                              activity: _activityController.text,
-                              people: _peopleController.text,
-                              place: _placeController.text,
-                              time:
-                                  '${_hour.toString().padLeft(2, '0')}:${_minute.toString().padLeft(2, '0')} ${_isAm ? "AM" : "PM"}',
-                            ),
-                          ),
-                        );
-                      },
+                      onPressed: _isSubmitting ? null : _submitMeetup,
+                      isLoading: _isSubmitting,
                     ),
                   ],
                 ),
@@ -218,7 +455,7 @@ class _TopBar extends StatelessWidget {
           color: Colors.white,
           shape: const CircleBorder(),
           elevation: 2,
-          shadowColor: _kPurpleDark.withOpacity(0.15),
+          shadowColor: _kPurpleDark.withValues(alpha: 0.15),
           child: InkWell(
             customBorder: const CircleBorder(),
             onTap: onBack ?? () => Navigator.pop(context),
@@ -266,6 +503,8 @@ class _FieldPill extends StatelessWidget {
   final TextEditingController controller;
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
+  final ValueChanged<String>? onChanged;
+  final Widget? trailing;
 
   const _FieldPill({
     required this.icon,
@@ -273,6 +512,8 @@ class _FieldPill extends StatelessWidget {
     required this.controller,
     this.keyboardType,
     this.validator,
+    this.onChanged,
+    this.trailing,
   });
 
   @override
@@ -284,7 +525,7 @@ class _FieldPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: _kPurpleDark.withOpacity(0.06),
+            color: _kPurpleDark.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -307,6 +548,7 @@ class _FieldPill extends StatelessWidget {
               controller: controller,
               keyboardType: keyboardType,
               validator: validator,
+              onChanged: onChanged,
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
@@ -319,10 +561,81 @@ class _FieldPill extends StatelessWidget {
                 hintStyle: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
-                  color: _kHeading.withOpacity(0.35),
+                  color: _kHeading.withValues(alpha: 0.35),
                 ),
-                errorStyle: const TextStyle(fontSize: 10.5, color: Color(0xFFE0736A)),
+                errorStyle: const TextStyle(
+                  fontSize: 10.5,
+                  color: Color(0xFFE0736A),
+                ),
               ),
+            ),
+          ),
+          ?trailing,
+        ],
+      ),
+    );
+  }
+}
+
+class _NumberDropdownPill extends StatelessWidget {
+  const _NumberDropdownPill({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.values,
+    required this.onChanged,
+  });
+
+  final IconData icon;
+  final String label;
+  final int value;
+  final List<int> values;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: _kPurpleDark.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: _kLavender,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: _kPurple, size: 18),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: DropdownButtonFormField<int>(
+              key: ValueKey('$label-$value'),
+              initialValue: value,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: label,
+                border: InputBorder.none,
+                isDense: true,
+              ),
+              items: values
+                  .map(
+                    (number) =>
+                        DropdownMenuItem(value: number, child: Text('$number')),
+                  )
+                  .toList(),
+              onChanged: onChanged,
             ),
           ),
         ],
@@ -339,8 +652,6 @@ class _SelectTimeCard extends StatelessWidget {
   final VoidCallback onMinuteTap;
   final VoidCallback onAmSelected;
   final VoidCallback onPmSelected;
-  final VoidCallback onCancel;
-  final VoidCallback onOk;
 
   const _SelectTimeCard({
     required this.hour,
@@ -350,8 +661,6 @@ class _SelectTimeCard extends StatelessWidget {
     required this.onMinuteTap,
     required this.onAmSelected,
     required this.onPmSelected,
-    required this.onCancel,
-    required this.onOk,
   });
 
   @override
@@ -374,8 +683,11 @@ class _SelectTimeCard extends StatelessWidget {
                   color: Colors.white,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.access_time_filled,
-                    color: _kPurple, size: 18),
+                child: const Icon(
+                  Icons.access_time_filled,
+                  color: _kPurple,
+                  size: 18,
+                ),
               ),
               const SizedBox(width: 12),
               const Text(
@@ -426,48 +738,24 @@ class _SelectTimeCard extends StatelessWidget {
             children: const [
               SizedBox(
                 width: 72,
-                child: Text('Hour',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: _kHeading)),
+                child: Text(
+                  'Hour',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: _kHeading),
+                ),
               ),
               SizedBox(width: 24),
               SizedBox(
                 width: 72,
-                child: Text('Minute',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: _kHeading)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: onCancel,
                 child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: _kPurpleDark.withOpacity(0.6),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: onOk,
-                child: const Text(
-                  'OK',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: _kPurpleDark,
-                  ),
+                  'Minute',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: _kHeading),
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 8),
         ],
       ),
     );
@@ -577,9 +865,13 @@ class _AmPmToggle extends StatelessWidget {
 }
 
 class _RequestMeetupButton extends StatelessWidget {
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
+  final bool isLoading;
 
-  const _RequestMeetupButton({required this.onPressed});
+  const _RequestMeetupButton({
+    required this.onPressed,
+    required this.isLoading,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -588,22 +880,21 @@ class _RequestMeetupButton extends StatelessWidget {
       height: 60,
       child: ElevatedButton(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _kPurple,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-        ).copyWith(
-          backgroundColor: WidgetStateProperty.all(Colors.transparent),
-          shadowColor: WidgetStateProperty.all(Colors.transparent),
-        ),
+        style:
+            ElevatedButton.styleFrom(
+              backgroundColor: _kPurple,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ).copyWith(
+              backgroundColor: WidgetStateProperty.all(Colors.transparent),
+              shadowColor: WidgetStateProperty.all(Colors.transparent),
+            ),
         child: Ink(
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [_kPurple, _kPurpleDark],
-            ),
+            gradient: const LinearGradient(colors: [_kPurple, _kPurpleDark]),
             borderRadius: BorderRadius.circular(30),
           ),
           child: Container(
@@ -615,17 +906,29 @@ class _RequestMeetupButton extends StatelessWidget {
                   width: 30,
                   height: 30,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.people_alt_rounded,
-                      color: Colors.white, size: 16),
+                  child: const Icon(
+                    Icons.people_alt_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                 ),
                 const SizedBox(width: 12),
-                const Text(
-                  'Request Meetup',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                ),
+                if (isLoading)
+                  const SizedBox.square(
+                    dimension: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                else
+                  const Text(
+                    'Request Meetup',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                  ),
               ],
             ),
           ),

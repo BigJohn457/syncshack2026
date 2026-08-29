@@ -5,8 +5,11 @@ from app.models import (
     MeetupRequest,
     MessageSender,
     UserProfile,
+    MeetupParticipant,
 )
+from app.repositories import UploadedImage
 from datetime import datetime
+from io import BytesIO
 
 
 def test_index_endpoint():
@@ -95,6 +98,45 @@ def test_submit_request_returns_created_data(monkeypatch):
     assert body["success"] is True
     assert body["data"]["creator_id"] == "user-id"
     assert body["data"]["location"] == payload["location"]
+
+
+def test_cancel_request_requires_user_identity():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post("/api/request/post/cancel-request", json={})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "X-User-ID header is required"
+
+
+def test_cancel_request_returns_cancelled_status(monkeypatch):
+    import importlib
+
+    request_routes = importlib.import_module("app.routes.request")
+    received = []
+
+    def cancel(request_id, user_id):
+        received.append((request_id, user_id))
+        return {"request_id": request_id, "status": "cancelled"}
+
+    monkeypatch.setattr(request_routes.request_repository, "cancel", cancel)
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/request/post/cancel-request",
+            json={"request_id": "request-001"},
+            headers={"X-User-ID": "user-123"},
+        )
+
+    assert response.status_code == 200
+    assert received == [("request-001", "user-123")]
+    assert response.get_json() == {
+        "success": True,
+        "message": "Request cancelled successfully",
+        "data": {"request_id": "request-001", "status": "cancelled"},
+    }
 
 
 def test_get_all_messages_requires_meetup_id():
@@ -420,3 +462,139 @@ def test_logout_clears_session():
             assert "user_id" not in flask_session
 
     assert response.status_code == 200
+
+
+def test_accept_invitation_requires_user_identity():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post("/api/meetup/post/accept-invitation", json={})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "X-User-ID header is required"
+
+
+def test_accept_invitation_returns_meetup_participant(monkeypatch):
+    import importlib
+
+    meetup_routes = importlib.import_module("app.routes.meetup")
+    monkeypatch.setattr(
+        meetup_routes.meetup_repository,
+        "accept_invitation",
+        lambda user_id, acceptance: MeetupParticipant(
+            meetup_id=acceptance.meetup_id,
+            user_id=user_id,
+            attendance_status="joined",
+        ),
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/meetup/post/accept-invitation",
+            json={"meetup_id": "meetup-001"},
+            headers={"X-User-ID": "user-123"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "success": True,
+        "message": "Invitation accepted successfully",
+        "data": {
+            "meetup_id": "meetup-001",
+            "user_id": "user-123",
+            "attendance_status": "joined",
+        },
+    }
+
+
+def test_participant_status_requires_user_identity():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/meetup/get/participant-status",
+            query_string={"meetup_id": "meetup-001"},
+        )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "X-User-ID header is required"
+
+
+def test_participant_status_returns_both_tables(monkeypatch):
+    import importlib
+
+    meetup_routes = importlib.import_module("app.routes.meetup")
+    expected = {
+        "meetup_id": "meetup-001",
+        "request_id": "request-001",
+        "user_id": "user-123",
+        "meetup_participant": {
+            "exists": True,
+            "attendance_status": "joined",
+            "joined_at": "2026-08-30T09:00:00",
+        },
+        "request_participant": {
+            "exists": True,
+            "status": "accepted",
+            "joined_at": "2026-08-30T08:50:00",
+            "updated_at": "2026-08-30T09:00:00",
+        },
+    }
+    monkeypatch.setattr(
+        meetup_routes.meetup_repository,
+        "get_participant_status",
+        lambda meetup_id, user_id: expected,
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.get(
+            "/api/meetup/get/participant-status",
+            query_string={"meetup_id": "meetup-001"},
+            headers={"X-User-ID": "user-123"},
+        )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True, "data": expected}
+
+
+def test_upload_picture_requires_multipart_file():
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post("/api/upload/post/picture")
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "picture file is required"
+
+
+def test_upload_picture_returns_public_url(monkeypatch):
+    import importlib
+
+    upload_routes = importlib.import_module("app.routes.upload")
+    monkeypatch.setattr(
+        upload_routes.image_repository,
+        "upload",
+        lambda picture: UploadedImage(
+            url="https://mg-kopi.syd1.digitaloceanspaces.com/personal/hey/image.png",
+            key="personal/hey/image.png",
+        ),
+    )
+    app = create_app("testing")
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/upload/post/picture",
+            data={"picture": (BytesIO(b"image-data"), "picture.png")},
+            content_type="multipart/form-data",
+        )
+
+    assert response.status_code == 201
+    assert response.get_json() == {
+        "success": True,
+        "data": {
+            "url": "https://mg-kopi.syd1.digitaloceanspaces.com/personal/hey/image.png",
+            "key": "personal/hey/image.png",
+        },
+    }

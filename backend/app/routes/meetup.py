@@ -1,13 +1,21 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 from mysql.connector import Error as MySQLError
 
-from app.repositories import UserRepository
+from app.models import InvitationAcceptance
+from app.repositories import (
+    InvitationAlreadyProcessedError,
+    InvitationNotFoundError,
+    MeetupRepository,
+    MeetupUnavailableError,
+    UserRepository,
+)
 from app.logging_config import log_handled_exception
 from ._helpers import read_varchar_id
 
 meetup = Blueprint("meetup", __name__, url_prefix="/meetups")
 meetup_api = Blueprint("meetup_api", __name__, url_prefix="/meetup")
 user_repository = UserRepository()
+meetup_repository = MeetupRepository()
 
 
 @meetup.get("")
@@ -54,3 +62,61 @@ def get_all_anonymous_profiles():
         return jsonify(success=False, error="user profile not found"), 404
 
     return jsonify(success=True, data=profile), 200
+
+
+@meetup_api.post("/post/accept-invitation")
+def accept_invitation():
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="X-User-ID header is required"), 400
+
+    try:
+        acceptance = InvitationAcceptance.from_dict(request.get_json(silent=True))
+        participant = meetup_repository.accept_invitation(user_id, acceptance)
+    except ValueError as exc:
+        log_handled_exception("Accept invitation validation failed", exc)
+        return jsonify(success=False, error=str(exc)), 400
+    except InvitationNotFoundError as exc:
+        log_handled_exception("Invitation not found", exc)
+        return jsonify(success=False, error=str(exc)), 404
+    except InvitationAlreadyProcessedError as exc:
+        log_handled_exception("Invitation already processed", exc)
+        return jsonify(success=False, error="invitation already processed"), 409
+    except MeetupUnavailableError as exc:
+        log_handled_exception("Meetup unavailable for invitation", exc)
+        return jsonify(success=False, error=str(exc)), 409
+    except MySQLError as exc:
+        log_handled_exception("Accept invitation database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+
+    return jsonify(
+        success=True,
+        message="Invitation accepted successfully",
+        data=participant.to_dict(),
+    ), 200
+
+
+@meetup_api.get("/get/participant-status")
+def get_participant_status():
+    user_id = str(
+        session.get("user_id") or request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="X-User-ID header is required"), 400
+
+    try:
+        meetup_id = read_varchar_id(request, "meetup_id")
+        status = meetup_repository.get_participant_status(meetup_id, user_id)
+    except ValueError as exc:
+        log_handled_exception("Participant status validation failed", exc)
+        return jsonify(success=False, error=str(exc)), 400
+    except InvitationNotFoundError as exc:
+        log_handled_exception("Participant status meetup not found", exc)
+        return jsonify(success=False, error="meetup not found"), 404
+    except MySQLError as exc:
+        log_handled_exception("Participant status database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+
+    return jsonify(success=True, data=status), 200

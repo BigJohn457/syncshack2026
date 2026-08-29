@@ -67,12 +67,12 @@ class NearbyRequestsApi {
     required double radiusKm,
   }) async {
     final uri = ApiConfig.uri('/api/request/get/all-request').replace(
-          queryParameters: {
-            'latitude': latitude.toString(),
-            'longitude': longitude.toString(),
-            'radius': radiusKm.toStringAsFixed(2),
-          },
-        );
+      queryParameters: {
+        'latitude': latitude.toString(),
+        'longitude': longitude.toString(),
+        'radius': radiusKm.toStringAsFixed(2),
+      },
+    );
 
     http.Response response;
     try {

@@ -17,12 +17,14 @@ const _kPendingYellow = Color(0xFFE5A117);
 enum AttendanceStatus { attending, pending }
 
 class Participant {
+  final String userId;
   final String name;
   final String avatarEmoji;
   final Color avatarBgColor;
   final AttendanceStatus status;
 
   const Participant({
+    this.userId = '',
     required this.name,
     required this.avatarEmoji,
     required this.avatarBgColor,
@@ -31,12 +33,14 @@ class Participant {
 }
 
 class GpInfoPage extends StatelessWidget {
+  final String meetupId;
   final String meetupTitle;
   final String meetupSubtitle;
   final List<Participant> participants;
 
   const GpInfoPage({
     super.key,
+    this.meetupId = '',
     this.meetupTitle = 'GROUP INFO',
     this.meetupSubtitle = 'Coffee Meetup • Today at 3:30 PM',
     this.participants = const [
@@ -91,10 +95,7 @@ class GpInfoPage extends StatelessWidget {
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [
-                    Color(0xFFF3EDFC),
-                    _kCream,
-                  ],
+                  colors: [Color(0xFFF3EDFC), _kCream],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
@@ -130,10 +131,7 @@ class GpInfoPage extends StatelessWidget {
           Positioned(
             top: topPadding + 195,
             right: 36,
-            child: const Text(
-              '💫',
-              style: TextStyle(fontSize: 16),
-            ),
+            child: const Text('💫', style: TextStyle(fontSize: 16)),
           ),
 
           SafeArea(
@@ -143,8 +141,10 @@ class GpInfoPage extends StatelessWidget {
                 // TOP BAR: Left Back/Avatar, Center "hey! ✨", Right Group Icon
                 // -------------------------------------------------------------
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 8,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -170,10 +170,7 @@ class GpInfoPage extends StatelessWidget {
                             ],
                           ),
                           child: const Center(
-                            child: Text(
-                              '👩🏽',
-                              style: TextStyle(fontSize: 24),
-                            ),
+                            child: Text('👩🏽', style: TextStyle(fontSize: 24)),
                           ),
                         ),
                       ),
@@ -254,8 +251,10 @@ class GpInfoPage extends StatelessWidget {
 
                 // Attendance Pill
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 7,
+                  ),
                   decoration: BoxDecoration(
                     color: _kLavenderPill,
                     borderRadius: BorderRadius.circular(20),
@@ -319,8 +318,22 @@ class GpInfoPage extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const RatePage(
+                              builder: (context) => RatePage(
+                                meetupId: meetupId,
                                 meetupType: 'coffee meetup',
+                                members: participants
+                                    .where(
+                                      (participant) =>
+                                          participant.status ==
+                                          AttendanceStatus.attending,
+                                    )
+                                    .map(
+                                      (participant) => RateableMember(
+                                        userId: participant.userId,
+                                        name: participant.name,
+                                      ),
+                                    )
+                                    .toList(),
                               ),
                             ),
                           );
@@ -329,10 +342,7 @@ class GpInfoPage extends StatelessWidget {
                           height: 54,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF27AE60),
-                                Color(0xFF2ECC71),
-                              ],
+                              colors: [Color(0xFF27AE60), Color(0xFF2ECC71)],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
@@ -384,10 +394,15 @@ class GpInfoPage extends StatelessWidget {
                             SnackBar(
                               content: const Row(
                                 children: [
-                                  Icon(Icons.logout_rounded,
-                                      color: Colors.white, size: 19),
+                                  Icon(
+                                    Icons.logout_rounded,
+                                    color: Colors.white,
+                                    size: 19,
+                                  ),
                                   SizedBox(width: 8),
-                                  Text('You left the meetup. Returned to home map.'),
+                                  Text(
+                                    'You left the meetup. Returned to home map.',
+                                  ),
                                 ],
                               ),
                               backgroundColor: const Color(0xFFE53935),
@@ -455,7 +470,9 @@ class _ParticipantCard extends StatelessWidget {
     final cardBorderColor = isAttending ? _kAttendingBorder : _kPendingBorder;
     final badgeTextColor = isAttending ? _kAttendingGreen : _kPendingYellow;
     final badgeLabel = isAttending ? 'ATTENDING!' : 'PENDING...';
-    final sparkleColor = isAttending ? const Color(0xFF8B64F8) : const Color(0xFFE5A117);
+    final sparkleColor = isAttending
+        ? const Color(0xFF8B64F8)
+        : const Color(0xFFE5A117);
 
     return Container(
       height: 82,
@@ -565,8 +582,10 @@ class _ParticipantCard extends StatelessWidget {
 
               // Status Pill (Elevated White Container)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -595,4 +614,3 @@ class _ParticipantCard extends StatelessWidget {
     );
   }
 }
-

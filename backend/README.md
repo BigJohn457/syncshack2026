@@ -61,6 +61,13 @@ directory. Configure its location with `LOG_FILE` in `.env`. Log files are
 excluded from Git and do not include request bodies, passwords, cookies, or
 database credentials.
 
+## DigitalOcean Spaces image uploads
+
+Set `SPACES_ACCESS_KEY_ID` and `SPACES_SECRET_ACCESS_KEY` in the ignored `.env`
+file. `POST /api/upload/post/picture` accepts a multipart field named `picture`,
+stores validated images below `personal/hey/` in the `mg-kopi` Space, and
+returns the public object URL. Never put Spaces credentials in `.env.example`.
+
 ## Test
 
 ```bash

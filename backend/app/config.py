@@ -30,6 +30,20 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = timedelta(days=7)
     LOG_FILE = _resolve_path(os.getenv("LOG_FILE", "app.log"))
+    SPACES_ACCESS_KEY_ID = os.getenv("SPACES_ACCESS_KEY_ID")
+    SPACES_SECRET_ACCESS_KEY = os.getenv("SPACES_SECRET_ACCESS_KEY")
+    SPACES_REGION = os.getenv("SPACES_REGION", "syd1")
+    SPACES_BUCKET = os.getenv("SPACES_BUCKET", "mg-kopi")
+    SPACES_FOLDER = os.getenv("SPACES_FOLDER", "personal/hey").strip("/")
+    SPACES_ENDPOINT_URL = os.getenv(
+        "SPACES_ENDPOINT_URL", "https://syd1.digitaloceanspaces.com"
+    )
+    SPACES_PUBLIC_BASE_URL = os.getenv(
+        "SPACES_PUBLIC_BASE_URL", "https://mg-kopi.syd1.digitaloceanspaces.com"
+    ).rstrip("/")
+    MAX_IMAGE_UPLOAD_BYTES = int(
+        os.getenv("MAX_IMAGE_UPLOAD_BYTES", str(10 * 1024 * 1024))
+    )
 
 
 class DevelopmentConfig(Config):

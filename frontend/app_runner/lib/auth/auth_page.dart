@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart' show HomePage;
+import '../requests/active_request_store.dart';
+import '../searching.dart';
+import '../chat.dart';
 import 'auth_api.dart';
+import 'auth_session.dart';
 
 const _purple = Color(0xFF7C4DFF);
 const _heading = Color(0xFF241B3A);
@@ -89,6 +93,7 @@ class _AuthPageState extends State<AuthPage> {
     });
 
     try {
+      Map<String, dynamic> loginPayload;
       if (_isSignUp) {
         await _api.signUp(
           firstName: _firstName.text,
@@ -99,13 +104,37 @@ class _AuthPageState extends State<AuthPage> {
           idPhoto: _idPhoto.text,
           facePhoto: _facePhoto.text,
         );
-        await _api.login(email: _email.text, password: _password.text);
+        loginPayload = await _api.login(
+          email: _email.text,
+          password: _password.text,
+        );
       } else {
-        await _api.login(email: _email.text, password: _password.text);
+        loginPayload = await _api.login(
+          email: _email.text,
+          password: _password.text,
+        );
+      }
+      final data = loginPayload['data'];
+      if (data is Map<String, dynamic>) {
+        AuthSession.currentUserId = data['id']?.toString();
       }
       if (!mounted) return;
+      final activeRequest = await ActiveRequestStore.load();
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const HomePage()),
+        MaterialPageRoute<void>(
+          builder: (_) {
+            if (activeRequest == null) return const HomePage();
+            if (activeRequest.isFull) {
+              return ChatPage(
+                activity: activeRequest.activity,
+                place: activeRequest.place,
+                meetupId: activeRequest.meetupId,
+              );
+            }
+            return SearchingPage.fromRequest(activeRequest);
+          },
+        ),
       );
     } on AuthException catch (error) {
       if (mounted) setState(() => _error = error.message);

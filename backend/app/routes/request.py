@@ -5,7 +5,14 @@ from mysql.connector import Error as MySQLError
 
 from app.models import MeetupRequest
 from app.logging_config import log_handled_exception
-from app.repositories import RequestRepository, UserNotFoundError
+from app.repositories import (
+    RequestCancellationError,
+    RequestNotFoundError,
+    RequestPermissionError,
+    RequestRepository,
+    UserNotFoundError,
+)
+from ._helpers import read_varchar_id
 
 request = Blueprint("request", __name__, url_prefix="/request")
 request_repository = RequestRepository()
@@ -89,3 +96,37 @@ def submit_request():
         return jsonify(success=False, error="database operation failed"), 500
 
     return jsonify(success=True, data=created_request.to_dict()), 201
+
+
+@request.post("/post/cancel-request")
+def cancel_request():
+    user_id = str(
+        session.get("user_id") or flask_request.headers.get("X-User-ID", "")
+    ).strip()
+    if not user_id:
+        return jsonify(success=False, error="X-User-ID header is required"), 400
+
+    try:
+        request_id = read_varchar_id(flask_request, "request_id")
+        cancelled = request_repository.cancel(request_id, user_id)
+    except ValueError as exc:
+        log_handled_exception("Cancel request validation failed", exc)
+        return jsonify(success=False, error=str(exc)), 400
+    except RequestNotFoundError as exc:
+        log_handled_exception("Cancel request not found", exc)
+        return jsonify(success=False, error="request not found"), 404
+    except RequestPermissionError as exc:
+        log_handled_exception("Cancel request permission denied", exc)
+        return jsonify(success=False, error="only the creator can cancel this request"), 403
+    except RequestCancellationError as exc:
+        log_handled_exception("Request cannot be cancelled", exc)
+        return jsonify(success=False, error=str(exc)), 409
+    except MySQLError as exc:
+        log_handled_exception("Cancel request database error", exc)
+        return jsonify(success=False, error="database operation failed"), 500
+
+    return jsonify(
+        success=True,
+        message="Request cancelled successfully",
+        data=cancelled,
+    ), 200
